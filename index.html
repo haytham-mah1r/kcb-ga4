@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KCB Design Build · Leads by City</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     COLOR TOKENS
+     Approximated to sit alongside Agency Analytics' own report
+     pages — light neutral canvas, white cards, an indigo accent
+     for interactive controls, a dark header. These are a close
+     visual match rather than exact brand values (this file can't
+     read Agency Analytics' own stylesheet), so nudge any of these
+     if you want a tighter match once it's embedded.
+  ============================================================ */
+  :root{
+    --bg:#F4F5F7;
+    --panel:#FFFFFF;
+    --line:#E3E6EB;
+    --line-soft:#EEF0F3;
+    --text:#191E28;
+    --text-dim:#5B6472;
+    --text-dimmer:#8B93A1;
+    --accent:#4F5FEA;
+    --accent-soft:#ECEEFD;
+    --accent-dark:#2F3A8F;
+    --paid:#DD7031;
+    --paid-soft:#FBEBE0;
+    --organic:#1B9E6E;
+    --organic-soft:#E3F6EE;
+    --other:#98A0AC;
+    --other-soft:#F0F1F3;
+    --good:#1B9E6E;
+    --warn:#C6862E;
+    --font-display:'Inter',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-body);}
+  body{padding-bottom:40px;}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px;}
+
+  /* ---------------- header ---------------- */
+  header{padding:20px 0 14px;}
+  .title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px;}
+  .title-row h1{font-family:var(--font-display);font-size:19px;font-weight:700;margin:0 0 4px;letter-spacing:-.01em;}
+  .title-row p{margin:0;font-size:12.5px;color:var(--text-dim);}
+  .data-status{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:9.5px;color:var(--text-dimmer);
+    margin:0 0 10px;padding:3px 9px 3px 7px;border:1px solid var(--line);border-radius:20px;line-height:1.6;background:#fff;}
+  .data-status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--text-dimmer);flex:none;}
+  .data-status.is-live{color:var(--good);border-color:#C6E9D9;background:#F1FAF6;}
+  .data-status.is-live::before{background:var(--good);}
+  .data-status.is-fallback{color:var(--warn);border-color:#F0DCB8;background:#FBF5EA;}
+  .data-status.is-fallback::before{background:var(--warn);}
+  .data-status.is-busy::before{background:none;width:9px;height:9px;border:1.5px solid var(--line);border-top-color:var(--accent);animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .controls-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:#fff;}
+  .seg button{font-family:var(--font-body);font-size:12px;font-weight:500;padding:6px 13px;line-height:1.5;background:#fff;border:none;
+    border-right:1px solid var(--line);color:var(--text-dim);cursor:pointer;transition:background .15s ease,color .15s ease;}
+  .seg button:last-child{border-right:none;}
+  .seg button:hover{background:var(--bg);}
+  .seg button.active{background:var(--accent);color:#fff;}
+  .seg.attr button.active{background:var(--accent-dark);}
+
+  /* ---------------- stat cards ---------------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0;}
+  .stat-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+  .stat-card .dot{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:6px;}
+  .stat-card .lbl{font-size:11.5px;color:var(--text-dim);display:flex;align-items:center;margin-bottom:8px;}
+  .stat-card .n{font-family:var(--font-mono);font-size:24px;font-weight:500;line-height:1;}
+  .stat-card .pct{font-family:var(--font-mono);font-size:11px;color:var(--text-dimmer);margin-top:5px;}
+  @media (max-width:760px){ .stats{grid-template-columns:repeat(2,1fr);} }
+
+  /* ---------------- panel + table ---------------- */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative;}
+  .panel-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;}
+  .panel-head h2{font-family:var(--font-display);font-size:14.5px;margin:0;font-weight:600;}
+  .panel-head .hint{font-size:11.5px;color:var(--text-dimmer);}
+  .panel-wait{position:absolute;inset:0;z-index:5;display:none;align-items:center;justify-content:center;gap:9px;
+    background:rgba(255,255,255,.7);font-size:12.5px;color:var(--text-dim);}
+  .panel.busy .panel-wait{display:flex;}
+  .spinner{width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex:none;}
+
+  table.leads{width:100%;border-collapse:collapse;font-size:13px;min-width:560px;}
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table.leads th{text-align:left;font-family:var(--font-mono);font-size:9px;letter-spacing:.06em;color:var(--text-dimmer);font-weight:400;
+    text-transform:uppercase;padding:9px 16px;border-bottom:1px solid var(--line);background:#FBFCFD;white-space:nowrap;}
+  table.leads th.num{text-align:right;}
+  table.leads td{padding:11px 16px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
+  table.leads td.num{font-family:var(--font-mono);font-size:13px;text-align:right;white-space:nowrap;}
+  table.leads td.num.total{font-weight:600;color:var(--text);}
+  table.leads tr:last-child td{border-bottom:none;}
+  table.leads tr:hover td{background:#FBFCFE;}
+  .city-cell{display:flex;flex-direction:column;gap:2px;min-width:120px;}
+  .city-cell .nm{font-weight:600;}
+  .city-cell .sub{font-family:var(--font-mono);font-size:10px;color:var(--text-dimmer);}
+  .barcell{width:160px;}
+  .bar-track{height:7px;border-radius:4px;overflow:hidden;background:var(--line-soft);display:flex;}
+  .bar-seg{height:100%;}
+  .pct-cell{font-family:var(--font-mono);font-size:10.5px;color:var(--text-dimmer);margin-top:4px;}
+  .not-set{color:var(--text-dimmer);font-style:italic;}
+
+  .table-empty{padding:44px 20px;text-align:center;color:var(--text-dimmer);font-size:13px;}
+
+  /* ---------------- footer ---------------- */
+  footer{max-width:1180px;margin:16px auto 0;padding:0 20px;color:var(--text-dimmer);font-size:11.5px;line-height:1.7;}
+  footer summary{cursor:pointer;color:var(--text-dim);font-family:var(--font-mono);font-size:10.5px;list-style:none;}
+  footer summary::-webkit-details-marker{display:none;}
+  footer summary::before{content:"+ ";color:var(--accent);}
+  footer details[open] summary::before{content:"– ";}
+  footer p{margin:6px 0;}
+  footer .legend{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0;}
+  footer .legend span{display:inline-flex;align-items:center;gap:5px;}
+  footer .sw{width:7px;height:7px;border-radius:2px;display:inline-block;}
+
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important;} .spinner,.data-status.is-busy::before{animation-duration:1.8s;} }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="title-row">
+      <div>
+        <h1>Leads by City</h1>
+        <p>KCB Design Build · generate_lead events, split by how each visit arrived</p>
+      </div>
+    </div>
+    <p class="data-status" id="dataStatus">Loading…</p>
+    <div class="controls-row">
+      <div class="seg" role="group" aria-label="Reporting period">
+        <button class="period-btn" data-mode="month" data-value="0" type="button">This month</button>
+        <button class="period-btn" data-mode="month" data-value="1" type="button">Last month</button>
+        <button class="period-btn" data-mode="range" data-value="6" type="button">Last 6 months</button>
+      </div>
+      <div class="seg attr" role="group" aria-label="Attribution basis">
+        <button class="attr-btn" data-attr="session" type="button" title="How the visit that produced this lead actually arrived">This visit</button>
+        <button class="attr-btn" data-attr="firstUser" type="button" title="How this browser was first ever acquired, however long ago">Ever acquired</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="panel" id="tablePanel">
+    <div class="panel-wait" id="waitPanel" role="status" aria-live="polite"><span class="spinner"></span><span>Fetching from Google Analytics…</span></div>
+    <div class="panel-head">
+      <h2 id="panelTitle">Leads by city</h2>
+      <span class="hint" id="panelHint"></span>
+    </div>
+    <div class="table-scroll" id="tableWrap"></div>
+  </div>
+
+  <footer>
+    <details>
+      <summary>How this is built</summary>
+      <p>Every row is the <b style="color:var(--text)">generate_lead</b> event from GA4, grouped by the "Nearest City" field selected on the contact and consultation forms. Paid / Organic / Other come from GA4's own channel grouping, not from a hand-built list — the same classification GA4 uses everywhere else.</p>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--paid)"></span>Paid — Paid Search, Paid Social, Paid Shopping, Display, Cross-network, and similar</span>
+        <span><span class="sw" style="background:var(--organic)"></span>Organic — Organic Search, Organic Social, Organic Video, Organic Shopping</span>
+        <span><span class="sw" style="background:var(--other)"></span>Other — Direct, Referral, Email, Unassigned, and anything else GA4 couldn't place in the first two</span>
+      </div>
+      <p><b style="color:var(--text)">This visit</b> vs. <b style="color:var(--text)">Ever acquired</b>: the first uses the channel of the specific visit the lead happened in; the second uses however this browser was first ever acquired, even if that was months earlier. They can legitimately disagree — someone can be organically acquired long ago and still click a paid ad on the visit that finally converts.</p>
+      <p>"(not set)" means the lead came through without a city selected on the form — worth a look if that count is climbing.</p>
+    </details>
+  </footer>
+</div>
+
+<script>
+/* =========================================================
+   1. CONFIG — paste your Apps Script /exec URL here once deployed
+========================================================= */
+const LIVE_DATA_URL = "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE";
+
+/* =========================================================
+   2. FALLBACK DATA — shown until LIVE_DATA_URL is set, or if
+   the live feed can't be reached. Shaped to match what the
+   Apps Script actually returns.
+========================================================= */
+const FALLBACK_PAYLOAD = {
+  ok: true,
+  period: "Last month",
+  totals: {
+    session:   { paid: 0, organic: 0, other: 9 },
+    firstUser: { paid: 0, organic: 0, other: 9 },
+    all: 9
+  },
+  cities: [
+    { city: "(not set)", total: 7, session: { paid: 0, organic: 0, other: 7 }, firstUser: { paid: 0, organic: 0, other: 7 } },
+    { city: "Calgary",   total: 1, session: { paid: 0, organic: 0, other: 1 }, firstUser: { paid: 0, organic: 0, other: 1 } },
+    { city: "Cochrane",  total: 1, session: { paid: 0, organic: 0, other: 1 }, firstUser: { paid: 0, organic: 0, other: 1 } }
+  ]
+};
+
+const fmt = n => Number(n || 0).toLocaleString();
+const pct = (n, total) => total ? Math.round((n / total) * 100) : 0;
+
+/* =========================================================
+   3. STATE
+========================================================= */
+const state = {
+  attr: 'session',          // 'session' or 'firstUser'
+  payload: null,
+};
+
+/* =========================================================
+   4. STAT CARDS
+========================================================= */
+function renderStats(){
+  const t = state.payload.totals[state.attr];
+  const all = state.payload.totals.all;
+  const cards = [
+    { label: 'Total leads', n: all, color: null },
+    { label: 'Paid', n: t.paid, color: 'var(--paid)' },
+    { label: 'Organic', n: t.organic, color: 'var(--organic)' },
+    { label: 'Other', n: t.other, color: 'var(--other)' },
+  ];
+  document.getElementById('stats').innerHTML = cards.map(c => `
+    <div class="stat-card">
+      <div class="lbl">${c.color ? `<span class="dot" style="background:${c.color}"></span>` : ''}${c.label}</div>
+      <div class="n">${fmt(c.n)}</div>
+      ${c.color ? `<div class="pct">${pct(c.n, all)}% of total</div>` : `<div class="pct">&nbsp;</div>`}
+    </div>
+  `).join('');
+}
+
+/* =========================================================
+   5. TABLE
+========================================================= */
+function renderTable(){
+  const wrap = document.getElementById('tableWrap');
+  const cities = state.payload.cities || [];
+  document.getElementById('panelHint').textContent =
+    state.attr === 'session' ? 'split by how this specific visit arrived' : 'split by how the browser was ever first acquired';
+
+  if (!cities.length){
+    wrap.innerHTML = '<div class="table-empty">No generate_lead events recorded for this period yet.</div>';
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'leads';
+  table.innerHTML = `
+    <thead><tr>
+      <th>City</th>
+      <th class="barcell">Split</th>
+      <th class="num">Paid</th>
+      <th class="num">Organic</th>
+      <th class="num">Other</th>
+      <th class="num">Total</th>
+    </tr></thead>
+    <tbody></tbody>`;
+  const tbody = table.querySelector('tbody');
+
+  cities.forEach(c => {
+    const split = c[state.attr];
+    const total = c.total || 1;
+    const isUnset = c.city === '(not set)';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><div class="city-cell"><span class="nm ${isUnset ? 'not-set' : ''}">${c.city}</span></div></td>
+      <td class="barcell">
+        <div class="bar-track">
+          ${split.paid ? `<div class="bar-seg" style="width:${pct(split.paid,total)}%;background:var(--paid)"></div>` : ''}
+          ${split.organic ? `<div class="bar-seg" style="width:${pct(split.organic,total)}%;background:var(--organic)"></div>` : ''}
+          ${split.other ? `<div class="bar-seg" style="width:${pct(split.other,total)}%;background:var(--other)"></div>` : ''}
+        </div>
+      </td>
+      <td class="num" style="color:var(--paid)">${split.paid ? fmt(split.paid) : '—'}</td>
+      <td class="num" style="color:var(--organic)">${split.organic ? fmt(split.organic) : '—'}</td>
+      <td class="num" style="color:var(--other)">${split.other ? fmt(split.other) : '—'}</td>
+      <td class="num total">${fmt(c.total)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  wrap.innerHTML = '';
+  wrap.appendChild(table);
+}
+
+function renderCurrent(){
+  renderStats();
+  renderTable();
+}
+
+/* =========================================================
+   6. CONTROLS
+========================================================= */
+document.querySelectorAll('.attr-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.attr = btn.dataset.attr;
+    document.querySelectorAll('.attr-btn').forEach(b => b.classList.toggle('active', b === btn));
+    renderCurrent();
+  });
+});
+document.querySelector('.attr-btn[data-attr="session"]').classList.add('active');
+
+/* =========================================================
+   7. LIVE FEED — one request per period, cached in memory so
+   switching back to an already-loaded period is instant.
+========================================================= */
+const periodCache = new Map();
+const inFlight = new Map();
+let requestSeq = 0;
+
+function setDataStatus(text, mode){
+  const el = document.getElementById('dataStatus');
+  el.textContent = text;
+  el.classList.toggle('is-live', mode === true);
+  el.classList.toggle('is-fallback', mode === false);
+  el.classList.toggle('is-busy', mode === 'busy');
+}
+function setActivePeriodButton(mode, value){
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode && Number(btn.dataset.value) === value);
+  });
+}
+function setBusy(on){ document.getElementById('tablePanel').classList.toggle('busy', !!on); }
+
+function periodKey(mode, value){ return mode + ':' + value; }
+function periodParam(mode, value){ return mode === 'range' ? ('rangeMonths=' + value) : ('months=' + value); }
+
+function fetchPeriod(mode, value){
+  const key = periodKey(mode, value);
+  if (inFlight.has(key)) return inFlight.get(key);
+  const sep = LIVE_DATA_URL.indexOf('?') === -1 ? '?' : '&';
+  const promise = fetch(LIVE_DATA_URL + sep + periodParam(mode, value), { cache: 'no-store' })
+    .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+    .then(data => {
+      if (!data || data.ok === false) throw new Error((data && data.error) || 'Malformed response');
+      periodCache.set(key, data);
+      return data;
+    })
+    .finally(() => inFlight.delete(key));
+  inFlight.set(key, promise);
+  return promise;
+}
+
+async function loadPeriod(mode, value){
+  setActivePeriodButton(mode, value);
+  const key = periodKey(mode, value);
+  const seq = ++requestSeq;
+
+  if (!LIVE_DATA_URL || LIVE_DATA_URL.indexOf('PASTE_YOUR') === 0){
+    setDataStatus('Showing example data — add your Apps Script URL in the code to go live', false);
+    state.payload = FALLBACK_PAYLOAD;
+    renderCurrent();
+    return;
+  }
+
+  const cached = periodCache.get(key);
+  if (cached){
+    setDataStatus('Live · ' + (cached.period || 'this period'), true);
+    state.payload = cached;
+    renderCurrent();
+    setBusy(false);
+    return;
+  }
+
+  setBusy(true);
+  setDataStatus('Fetching from Google Analytics…', 'busy');
+  try {
+    const data = await fetchPeriod(mode, value);
+    if (seq !== requestSeq) return;
+    setDataStatus('Live · ' + (data.period || 'this period'), true);
+    state.payload = data;
+    renderCurrent();
+  } catch (err){
+    if (seq !== requestSeq) return;
+    console.warn('Live GA4 feed unavailable, showing example data instead:', err);
+    setDataStatus('Live feed unavailable right now — showing example data', false);
+    state.payload = FALLBACK_PAYLOAD;
+    renderCurrent();
+  } finally {
+    if (seq === requestSeq) setBusy(false);
+  }
+}
+
+document.querySelectorAll('.period-btn').forEach(btn => {
+  btn.addEventListener('click', () => loadPeriod(btn.dataset.mode, Number(btn.dataset.value)));
+});
+
+// Default view: Last month, as requested.
+loadPeriod('month', 1);
+</script>
+</body>
+</html>
