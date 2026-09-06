@@ -71,6 +71,8 @@
   .seg button:last-child{border-right:none;}
   .seg button:hover{background:var(--bg);}
   .seg button.active{background:var(--accent);color:#fff;}
+  .seg button:disabled{color:#BCC2CC;cursor:not-allowed;background:#FAFBFC;}
+  .seg button:disabled:hover{background:#FAFBFC;}
   .seg.attr button.active{background:var(--accent-dark);}
 
   /* ---------------- custom range picker ---------------- */
@@ -195,6 +197,7 @@
         <button class="period-btn" data-mode="custom" id="customBtn" type="button" aria-expanded="false" aria-controls="rangePicker">Custom…</button>
       </div>
       <div class="seg attr" role="group" aria-label="Attribution basis">
+        <button class="attr-btn" data-attr="crm" id="crmBtn" type="button" title="The source GoHighLevel recorded on the submission itself">CRM source</button>
         <button class="attr-btn" data-attr="session" type="button" title="How the visit that produced this lead actually arrived">This visit</button>
         <button class="attr-btn" data-attr="firstUser" type="button" title="How this browser was first ever acquired, however long ago">Ever acquired</button>
       </div>
@@ -244,7 +247,7 @@
   <div class="panel" id="channelPanel">
     <div class="panel-head">
       <h2>Every channel, unrolled</h2>
-      <span class="hint">GA4's own channel grouping, before it gets folded into four buckets</span>
+      <span class="hint" id="channelHint">GA4's own channel grouping, before it gets folded into four buckets</span>
     </div>
     <div class="table-scroll" id="channelWrap"></div>
   </div>
@@ -376,7 +379,8 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;
    3. STATE
 ========================================================= */
 const state = {
-  attr: 'session',          // 'session' or 'firstUser'
+  attr: 'session',          // 'crm', 'session' or 'firstUser'
+  attrChosen: false,        // true once the person picks a scope themselves
   payload: null,
 };
 
@@ -390,16 +394,16 @@ function normalize(raw){
   let legacy = false;
 
   p.totals = p.totals || { all: 0 };
-  ['session','firstUser'].forEach(scope => {
+  ['session','firstUser','crm'].forEach(scope => {
     const t = p.totals[scope] = p.totals[scope] || {};
-    if (t.direct === undefined){ t.direct = 0; legacy = true; }
+    if (scope !== 'crm' && t.direct === undefined){ t.direct = 0; legacy = true; }
     BUCKETS.forEach(b => { t[b.key] = Number(t[b.key] || 0); });
   });
   p.totals.all = Number(p.totals.all || 0);
   if (p.totals.formSubmit === undefined){ p.totals.formSubmit = null; legacy = true; }
 
   p.cities = (p.cities || []).map(c => {
-    ['session','firstUser'].forEach(scope => {
+    ['session','firstUser','crm'].forEach(scope => {
       const s = c[scope] = c[scope] || {};
       if (s.direct === undefined) s.direct = 0;
       BUCKETS.forEach(b => { s[b.key] = Number(s[b.key] || 0); });
@@ -407,13 +411,19 @@ function normalize(raw){
     c.total = Number(c.total || 0);
     if (c.formSubmit === undefined) c.formSubmit = null;
     c.campaigns = c.campaigns || [];
+    c.crmCampaigns = c.crmCampaigns || [];
     return c;
   });
 
-  p.campaigns = p.campaigns || { session: [], firstUser: [] };
-  p.channels  = p.channels  || { session: [], firstUser: [] };
-  p.pages     = p.pages     || [];
-  if (!p.campaigns.session || !p.channels.session) legacy = true;
+  p.campaigns = p.campaigns || { session: [], firstUser: [], crm: [] };
+  p.channels  = p.channels  || { session: [], firstUser: [], crm: [] };
+  ['session','firstUser','crm'].forEach(scope => {
+    p.campaigns[scope] = p.campaigns[scope] || [];
+    p.channels[scope]  = p.channels[scope]  || [];
+  });
+  p.pages = p.pages || [];
+  p.crmAvailable = !!p.crmAvailable;
+  if (!p.campaigns.session.length && !p.channels.session.length && !p.pages.length) legacy = true;
   p.legacy = legacy;
   return p;
 }
@@ -457,8 +467,11 @@ function gapCell(leads, forms){
 function renderTable(){
   const wrap = document.getElementById('tableWrap');
   const cities = state.payload.cities || [];
-  document.getElementById('panelHint').textContent =
-    state.attr === 'session' ? 'split by how this specific visit arrived' : 'split by how the browser was ever first acquired';
+  document.getElementById('panelHint').textContent = {
+    crm: 'split by the source GoHighLevel recorded on the submission',
+    session: 'split by how this specific visit arrived',
+    firstUser: 'split by how the browser was ever first acquired'
+  }[state.attr];
 
   if (!cities.length){
     wrap.innerHTML = '<div class="table-empty">No generate_lead events recorded for this period yet.</div>';
@@ -485,7 +498,9 @@ function renderTable(){
     const split = c[state.attr];
     const total = c.total || 1;
     const isUnset = c.city === '(not set)';
-    const camps = state.attr === 'session' ? (c.campaigns || []) : [];
+    const camps = state.attr === 'session' ? (c.campaigns || [])
+                : state.attr === 'crm'     ? (c.crmCampaigns || [])
+                : [];
     const hasDetail = camps.length > 0;
 
     const tr = document.createElement('tr');
@@ -553,8 +568,11 @@ function renderTable(){
 function renderCampaigns(){
   const wrap = document.getElementById('campaignWrap');
   const rows = (state.payload.campaigns[state.attr] || []).filter(r => r.bucket === 'paid');
-  document.getElementById('campaignHint').textContent =
-    state.attr === 'session' ? 'campaign on the converting visit' : 'campaign that first acquired the browser';
+  document.getElementById('campaignHint').textContent = {
+    crm: 'campaign as recorded by GoHighLevel on the submission',
+    session: 'campaign on the converting visit',
+    firstUser: 'campaign that first acquired the browser'
+  }[state.attr];
 
   if (!rows.length){
     wrap.innerHTML = '<div class="table-empty">' +
@@ -593,6 +611,10 @@ function renderCampaigns(){
 function renderChannels(){
   const wrap = document.getElementById('channelWrap');
   const rows = state.payload.channels[state.attr] || [];
+  const isCrm = state.attr === 'crm';
+  document.getElementById('channelHint').textContent = isCrm
+    ? 'exactly as GoHighLevel worded it, before bucketing'
+    : "GA4's own channel grouping, before it gets folded into four buckets";
   if (!rows.length){
     wrap.innerHTML = '<div class="table-empty">' +
       (state.payload.legacy
@@ -604,15 +626,18 @@ function renderChannels(){
   wrap.innerHTML = `
     <table class="leads" style="min-width:520px">
       <thead><tr>
-        <th>GA4 channel</th><th>Bucket</th><th class="num">Leads</th><th class="num">Forms</th><th class="num">Share</th>
+        <th>${isCrm ? 'Source recorded by GoHighLevel' : 'GA4 channel'}</th><th>Bucket</th><th class="num">Leads</th><th class="num">Forms</th><th class="num">Share</th>
       </tr></thead>
       <tbody>
         ${rows.map(r => {
-          const unassigned = r.channel === 'Unassigned' || r.channel === '(not set)';
+          const blank = r.channel === '(not set)';
+          const unassigned = !isCrm && (r.channel === 'Unassigned' || blank);
+          const flag = unassigned
+            ? ' <span class="gap" title="GA4 could not tie these events to any acquisition — usually a broken session link, not real traffic">couldn\'t be attributed</span>'
+            : (isCrm && blank ? ' <span class="gap" title="These leads reached GA4 without a lead_source parameter">no source sent</span>' : '');
           return `
           <tr class="row">
-            <td><span class="nm">${esc(r.channel)}</span>${unassigned
-              ? ' <span class="gap" title="GA4 could not tie these events to any acquisition — usually a broken session link, not real traffic">couldn\'t be attributed</span>' : ''}</td>
+            <td><span class="nm">${esc(r.channel)}</span>${flag}</td>
             <td><span class="chip ${esc(r.bucket)}">${esc(r.bucket)}</span></td>
             <td class="num total">${fmt(r.leads)}</td>
             <td class="num">${gapCell(r.leads, r.formSubmit)}</td>
@@ -656,8 +681,28 @@ function renderPages(){
     </table>`;
 }
 
+function updateAttrButtons(){
+  const crmBtn = document.getElementById('crmBtn');
+  const available = !!state.payload.crmAvailable;
+  crmBtn.disabled = !available;
+  crmBtn.title = available
+    ? 'The source GoHighLevel recorded on the submission itself'
+    : 'Needs the lead_source custom dimension registered in GA4 and sent from n8n';
+
+  // The CRM value is captured by the system that actually saw the click,
+  // so when it's there it's the better default. Only auto-switch once,
+  // and never away from a scope the person chose themselves.
+  if (available && !state.attrChosen) state.attr = 'crm';
+  if (!available && state.attr === 'crm') state.attr = 'session';
+
+  document.querySelectorAll('.attr-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.attr === state.attr);
+  });
+}
+
 function renderCurrent(){
   document.getElementById('upgradeNotice').classList.toggle('show', !!state.payload.legacy);
+  updateAttrButtons();
   renderStats();
   renderTable();
   renderCampaigns();
@@ -670,12 +715,13 @@ function renderCurrent(){
 ========================================================= */
 document.querySelectorAll('.attr-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    if (btn.disabled) return;
     state.attr = btn.dataset.attr;
+    state.attrChosen = true;
     document.querySelectorAll('.attr-btn').forEach(b => b.classList.toggle('active', b === btn));
     renderCurrent();
   });
 });
-document.querySelector('.attr-btn[data-attr="session"]').classList.add('active');
 
 /* =========================================================
    11. LIVE FEED — one request per period, cached in memory so
