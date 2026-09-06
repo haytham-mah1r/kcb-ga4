@@ -73,6 +73,22 @@
   .seg button.active{background:var(--accent);color:#fff;}
   .seg.attr button.active{background:var(--accent-dark);}
 
+  /* ---------------- custom range picker ---------------- */
+  .range-picker{display:none;align-items:flex-end;gap:9px;flex-wrap:wrap;margin-top:10px;padding:12px 14px;
+    background:var(--panel);border:1px solid var(--line);border-radius:9px;}
+  .range-picker.open{display:flex;}
+  .range-field{display:flex;flex-direction:column;gap:4px;}
+  .range-field label{font-family:var(--font-mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dimmer);}
+  .range-field input{font-family:var(--font-mono);font-size:12px;padding:6px 9px;border:1px solid var(--line);
+    border-radius:6px;background:#fff;color:var(--text);min-width:140px;}
+  .range-field input:hover{border-color:#CBD1DA;}
+  .range-apply{font-family:var(--font-body);font-size:12px;font-weight:500;padding:7px 14px;border-radius:6px;
+    border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;transition:background .15s ease;}
+  .range-apply:hover{background:var(--accent-dark);border-color:var(--accent-dark);}
+  .range-msg{font-size:11.5px;line-height:1.55;margin:0;flex:1 1 200px;min-width:170px;color:var(--text-dimmer);}
+  .range-msg.err{color:#B4442A;}
+  .range-msg.warn{color:var(--warn);}
+
   /* upgrade notice shown when the endpoint still returns the old payload */
   .notice{display:none;margin:12px 0 0;padding:10px 13px;border:1px solid #F0DCB8;background:#FBF5EA;border-radius:8px;
     font-size:12px;line-height:1.6;color:#7A5A1E;}
@@ -176,12 +192,26 @@
         <button class="period-btn" data-mode="month" data-value="0" type="button">This month</button>
         <button class="period-btn" data-mode="month" data-value="1" type="button">Last month</button>
         <button class="period-btn" data-mode="range" data-value="6" type="button">Last 6 months</button>
+        <button class="period-btn" data-mode="custom" id="customBtn" type="button" aria-expanded="false" aria-controls="rangePicker">Custom…</button>
       </div>
       <div class="seg attr" role="group" aria-label="Attribution basis">
         <button class="attr-btn" data-attr="session" type="button" title="How the visit that produced this lead actually arrived">This visit</button>
         <button class="attr-btn" data-attr="firstUser" type="button" title="How this browser was first ever acquired, however long ago">Ever acquired</button>
       </div>
     </div>
+    <div class="range-picker" id="rangePicker">
+      <div class="range-field">
+        <label for="rangeStart">From</label>
+        <input type="date" id="rangeStart">
+      </div>
+      <div class="range-field">
+        <label for="rangeEnd">To</label>
+        <input type="date" id="rangeEnd">
+      </div>
+      <button class="range-apply" id="rangeApply" type="button">Show this range</button>
+      <p class="range-msg" id="rangeMsg" role="status" aria-live="polite"></p>
+    </div>
+
     <div class="notice" id="upgradeNotice">
       <b>Channel and campaign detail isn't in the feed yet.</b>
       The endpoint is still returning the older three-bucket payload, so Direct is folded into Other and the campaign,
@@ -252,6 +282,27 @@
    1. CONFIG — paste your Apps Script /exec URL here once deployed
 ========================================================= */
 const LIVE_DATA_URL = "https://script.google.com/macros/s/AKfycbwMw3AH2gtuOkya2wlQ4QSZDXPlNY1aUYwyHYVsi9YUukpFESgnVvLRStWdj-yyXQD8/exec";
+
+/* --- custom range settings ---------------------------------------
+   REPORTING_TIMEZONE must match the Apps Script constant of the same
+   name and GA4 Admin → Property Settings → Reporting time zone. GA4
+   decides what "today" means in that timezone, not the viewer's, so a
+   date picked from another province could otherwise reach a day into
+   a future GA4 has no data for.
+
+   EVENTS_LIVE_SINCE: the date generate_lead and form_submit started
+   recording for real, as 'YYYY-MM-DD'. A range reaching back past it
+   returns zeros that look like a quiet month but are really an absence
+   of tracking. Set it and the picker says so. Leave null to skip.
+
+   DATA_RETENTION_MONTHS: GA4 Admin → Data Settings → Data Retention.
+   Event-scoped custom dimensions — which is what Nearest City is —
+   are dropped past this horizon even though the aggregate event counts
+   survive, so an older range can return leads with no city attached.
+------------------------------------------------------------------ */
+const REPORTING_TIMEZONE = 'America/Edmonton';
+const EVENTS_LIVE_SINCE = null;
+const DATA_RETENTION_MONTHS = 14;
 
 /* =========================================================
    2. FALLBACK DATA — shown until LIVE_DATA_URL is set, or if
@@ -643,13 +694,21 @@ function setDataStatus(text, mode){
 }
 function setActivePeriodButton(mode, value){
   document.querySelectorAll('.period-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.mode === mode && Number(btn.dataset.value) === value);
+    const match = btn.dataset.mode === mode &&
+      (mode === 'custom' || Number(btn.dataset.value) === value);
+    btn.classList.toggle('active', match);
   });
 }
 function setBusy(on){ document.getElementById('tablePanel').classList.toggle('busy', !!on); }
 
 function periodKey(mode, value){ return mode + ':' + value; }
-function periodParam(mode, value){ return mode === 'range' ? ('rangeMonths=' + value) : ('months=' + value); }
+function periodParam(mode, value){
+  if (mode === 'custom'){
+    const parts = String(value).split('|');
+    return 'start=' + encodeURIComponent(parts[0]) + '&end=' + encodeURIComponent(parts[1]);
+  }
+  return mode === 'range' ? ('rangeMonths=' + value) : ('months=' + value);
+}
 
 function fetchPeriod(mode, value){
   const key = periodKey(mode, value);
@@ -667,10 +726,11 @@ function fetchPeriod(mode, value){
   return promise;
 }
 
-async function loadPeriod(mode, value){
+async function loadPeriod(mode, value, label){
   setActivePeriodButton(mode, value);
   const key = periodKey(mode, value);
   const seq = ++requestSeq;
+  const named = data => label || (data && data.period) || 'this period';
 
   if (!LIVE_DATA_URL || LIVE_DATA_URL.indexOf('PASTE_YOUR') === 0){
     setDataStatus('Showing example data — add your Apps Script URL in the code to go live', false);
@@ -681,7 +741,7 @@ async function loadPeriod(mode, value){
 
   const cached = periodCache.get(key);
   if (cached){
-    setDataStatus('Live · ' + (cached.period || 'this period'), true);
+    setDataStatus('Live · ' + named(cached), true);
     state.payload = normalize(cached);
     renderCurrent();
     setBusy(false);
@@ -693,7 +753,7 @@ async function loadPeriod(mode, value){
   try {
     const data = await fetchPeriod(mode, value);
     if (seq !== requestSeq) return;
-    setDataStatus('Live · ' + (data.period || 'this period'), true);
+    setDataStatus('Live · ' + named(data), true);
     state.payload = normalize(data);
     renderCurrent();
   } catch (err){
@@ -708,8 +768,133 @@ async function loadPeriod(mode, value){
 }
 
 document.querySelectorAll('.period-btn').forEach(btn => {
-  btn.addEventListener('click', () => loadPeriod(btn.dataset.mode, Number(btn.dataset.value)));
+  if (btn.dataset.mode === 'custom') return;   // handled by the picker below
+  btn.addEventListener('click', () => {
+    closeRangePicker();
+    loadPeriod(btn.dataset.mode, Number(btn.dataset.value));
+  });
 });
+
+/* =========================================================
+   12. CUSTOM RANGE
+   Sends ?start=&end= straight through to the Apps Script, which
+   already handles that pair as its first branch. Dates are ISO
+   strings end to end — no Date objects cross the wire, so nothing
+   gets shifted by a timezone on the way.
+========================================================= */
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// What day is it where GA4 reports from? en-CA formats as YYYY-MM-DD.
+function todayInReportingTZ(){
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: REPORTING_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date());
+}
+
+function isoMinusMonths(iso, months){
+  const p = iso.split('-').map(Number);
+  let year = p[0], month = p[1] - months;
+  while (month <= 0){ month += 12; year -= 1; }
+  const lastDay = new Date(year, month, 0).getDate();
+  return year + '-' + String(month).padStart(2, '0') + '-' + String(Math.min(p[2], lastDay)).padStart(2, '0');
+}
+
+function prettyDate(iso){
+  const p = iso.split('-').map(Number);
+  return p[2] + ' ' + MONTH_ABBR[p[1] - 1] + ' ' + p[0];
+}
+function prettyRange(a, b){
+  return a === b ? prettyDate(a) : (prettyDate(a) + ' – ' + prettyDate(b));
+}
+function daysBetween(a, b){
+  return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
+}
+
+const rangePicker = document.getElementById('rangePicker');
+const rangeStart = document.getElementById('rangeStart');
+const rangeEnd = document.getElementById('rangeEnd');
+const rangeMsg = document.getElementById('rangeMsg');
+const customBtn = document.getElementById('customBtn');
+
+function setRangeMsg(text, kind){
+  rangeMsg.textContent = text || '';
+  rangeMsg.classList.toggle('err', kind === 'err');
+  rangeMsg.classList.toggle('warn', kind === 'warn');
+}
+
+function closeRangePicker(){
+  rangePicker.classList.remove('open');
+  customBtn.setAttribute('aria-expanded', 'false');
+}
+
+// Returns null when the range is usable, otherwise a message to show.
+// Warnings don't block — they explain a result that would otherwise
+// look like a real drop in leads.
+function checkRange(start, end){
+  const today = todayInReportingTZ();
+  if (!start || !end) return { kind: 'err', text: 'Pick both a start and an end date.' };
+  if (start > end) return { kind: 'err', text: 'The start date falls after the end date.' };
+  if (start > today) return { kind: 'err', text: 'That start date hasn\'t happened yet in ' + REPORTING_TIMEZONE.split('/')[1].replace('_', ' ') + '.' };
+  if (end > today) return { kind: 'err', text: 'GA4 has no data past ' + prettyDate(today) + ' yet. Move the end date back.' };
+
+  if (EVENTS_LIVE_SINCE && start < EVENTS_LIVE_SINCE){
+    return { kind: 'warn', pass: true,
+      text: 'Heads up: these events only started recording on ' + prettyDate(EVENTS_LIVE_SINCE) +
+            '. Anything before that reads as zero because it wasn\'t tracked, not because nothing happened.' };
+  }
+  const retentionEdge = isoMinusMonths(today, DATA_RETENTION_MONTHS);
+  if (start < retentionEdge){
+    return { kind: 'warn', pass: true,
+      text: 'Heads up: GA4 keeps event-scoped detail for ' + DATA_RETENTION_MONTHS + ' months, back to ' + prettyDate(retentionEdge) +
+            '. Older leads can still be counted but arrive with no city attached.' };
+  }
+  if (end === today){
+    return { kind: 'warn', pass: true,
+      text: 'Today is included and still processing — GA4 can take up to 48 hours to settle, so the last day or two may rise.' };
+  }
+  return null;
+}
+
+function applyCustomRange(){
+  const start = rangeStart.value;
+  const end = rangeEnd.value;
+  const verdict = checkRange(start, end);
+
+  if (verdict && !verdict.pass){
+    setRangeMsg(verdict.text, 'err');
+    return;
+  }
+  setRangeMsg(verdict ? verdict.text : (daysBetween(start, end) + 1) + ' days selected.', verdict ? 'warn' : null);
+  loadPeriod('custom', start + '|' + end, prettyRange(start, end));
+}
+
+customBtn.addEventListener('click', () => {
+  const open = !rangePicker.classList.contains('open');
+  rangePicker.classList.toggle('open', open);
+  customBtn.setAttribute('aria-expanded', String(open));
+  if (open) rangeStart.focus();
+});
+
+[rangeStart, rangeEnd].forEach(input => {
+  input.addEventListener('change', () => {
+    if (!rangeStart.value || !rangeEnd.value) return setRangeMsg('');
+    const verdict = checkRange(rangeStart.value, rangeEnd.value);
+    setRangeMsg(verdict ? verdict.text : (daysBetween(rangeStart.value, rangeEnd.value) + 1) + ' days selected.',
+                verdict ? (verdict.pass ? 'warn' : 'err') : null);
+  });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') applyCustomRange(); });
+});
+document.getElementById('rangeApply').addEventListener('click', applyCustomRange);
+
+// Seed the picker with this month so far, and stop either field from
+// reaching past the last day GA4 actually has.
+(function seedRangePicker(){
+  const today = todayInReportingTZ();
+  rangeStart.max = today;
+  rangeEnd.max = today;
+  rangeStart.value = today.slice(0, 8) + '01';
+  rangeEnd.value = today;
+})();
 
 // Default view: Last month, as requested.
 loadPeriod('month', 1);
