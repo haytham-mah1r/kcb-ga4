@@ -215,6 +215,8 @@
       <p class="range-msg" id="rangeMsg" role="status" aria-live="polite"></p>
     </div>
 
+    <div class="notice" id="attributionNotice"></div>
+
     <div class="notice" id="upgradeNotice">
       <b>Channel and campaign detail isn't in the feed yet.</b>
       The endpoint is still returning the older three-bucket payload, so Direct is folded into Other and the campaign,
@@ -272,9 +274,10 @@
         <span><span class="sw" style="background:var(--other)"></span>Other — Referral, Email, SMS, Unassigned, and anything else GA4 couldn't place</span>
       </div>
       <p><b style="color:var(--text)">This visit</b> vs. <b style="color:var(--text)">Ever acquired</b>: the first uses the channel of the specific visit the lead happened in; the second uses however this browser was first ever acquired, even if that was months earlier. They can legitimately disagree — someone can be organically acquired long ago and still click a paid ad on the visit that finally converts.</p>
-      <p><b style="color:var(--text)">generate_lead vs form_submit</b>: these two fire on the same submission, so the counts should track each other closely. A form_submit with no matching lead usually means the lead tag didn't fire — a broken selector, a validation bounce, or a form that isn't tagged yet. Both events are recent additions to the property, so treat any period that starts before they were installed as partial.</p>
+      <p><b style="color:var(--text)">generate_lead vs form_submission</b>: these two fire on the same submission, so the totals should track each other closely. A form_submission with no matching lead usually means the lead tag didn't fire — a broken selector, a validation bounce, or a form that isn't tagged yet. Both events are recent additions to the property, so treat any period that starts before they were installed as partial.</p>
+      <p>Compare the two at the total level, not row by row. form_submission fires in the browser and carries no Nearest City parameter, so its counts collect under "(not set)" while the leads sit under real city names. That makes the per-city Forms column look mismatched even when every submission paired correctly. Sending nearest_city on form_submission too would line them up.</p>
       <p><b style="color:var(--text)">Direct is not the same as Unassigned.</b> Direct means GA4 saw a real session that arrived with no referrer. Unassigned means GA4 couldn't tie the event to any acquisition at all — normally a broken link between the server-side lead and the browsing session it belongs to. Direct now has its own column so the two stop looking alike.</p>
-      <p><b style="color:var(--text)">Why the pages table can look lopsided:</b> generate_lead is sent server-side, so unless the payload includes page_location, GA4 has no page to file it under and it lands in "(not set)". form_submit fires in the browser and will show the real path. All the forms on one page and all the leads under "(not set)" is that gap, not a reporting fault.</p>
+      <p><b style="color:var(--text)">Why the pages table can look lopsided:</b> generate_lead is sent server-side, so unless the payload includes page_location, GA4 has no page to file it under and it lands in "(not set)". form_submission fires in the browser and will show the real path. All the forms on one page and all the leads under "(not set)" is that gap, not a reporting fault.</p>
       <p>"(not set)" means the lead came through without a city selected on the form — worth a look if that count is climbing. On campaign rows it means the visit carried no campaign parameter.</p>
     </details>
   </footer>
@@ -293,7 +296,7 @@ const LIVE_DATA_URL = "https://script.google.com/macros/s/AKfycbwMw3AH2gtuOkya2w
    date picked from another province could otherwise reach a day into
    a future GA4 has no data for.
 
-   EVENTS_LIVE_SINCE: the date generate_lead and form_submit started
+   EVENTS_LIVE_SINCE: the date generate_lead and form_submission started
    recording for real, as 'YYYY-MM-DD'. A range reaching back past it
    returns zeros that look like a quiet month but are really an absence
    of tracking. Set it and the picker says so. Leave null to skip.
@@ -316,7 +319,7 @@ const FALLBACK_PAYLOAD = {
   ok: true,
   schema: 2,
   period: "Last month (example data)",
-  events: { lead: "generate_lead", form: "form_submit" },
+  events: { lead: "generate_lead", form: "form_submission" },
   totals: {
     session:   { direct: 5, organic: 2, paid: 2, other: 0 },
     firstUser: { direct: 3, organic: 4, paid: 2, other: 0 },
@@ -438,10 +441,10 @@ function renderStats(){
 
   const pairLine = forms == null
     ? '&nbsp;'
-    : 'form_submit ' + fmt(forms) + (forms ? ' · ' + pct(all, forms) + '% paired' : '');
+    : eventName('form') + ' ' + fmt(forms) + (forms ? ' · ' + pct(all, forms) + '% paired' : '');
 
   const cards = [
-    { label: 'generate_lead', n: all, color: null, sub: pairLine },
+    { label: eventName('lead'), n: all, color: null, sub: pairLine },
     ...BUCKETS.map(b => ({ label: b.label, n: t[b.key], color: b.color, sub: pct(t[b.key], all) + '% of leads' }))
   ];
 
@@ -664,7 +667,7 @@ function renderPages(){
   wrap.innerHTML = `
     <table class="leads" style="min-width:520px">
       <thead><tr>
-        <th>Page</th><th class="num">generate_lead</th><th class="num">form_submit</th><th class="num">Unpaired forms</th>
+        <th>Page</th><th class="num">${eventName('lead')}</th><th class="num">${eventName('form')}</th><th class="num">Unpaired forms</th>
       </tr></thead>
       <tbody>
         ${rows.map(r => {
@@ -700,9 +703,38 @@ function updateAttrButtons(){
   });
 }
 
+function eventName(which){
+  const e = state.payload.events || {};
+  return e[which] || (which === 'form' ? 'form_submission' : 'generate_lead');
+}
+
+// "Other" is a bucket, not a source. When GA4 has filled it with
+// Unassigned rows, that means it couldn't attribute the lead at all —
+// which reads very differently from "this lead came from somewhere
+// minor," so it gets said out loud rather than left to inference.
+function renderAttributionNotice(){
+  const el = document.getElementById('attributionNotice');
+  const rows = state.payload.channels[state.attr] || [];
+  const unattributed = state.attr === 'crm' ? [] :
+    rows.filter(r => r.channel === 'Unassigned' || r.channel === '(not set)');
+  const n = unattributed.reduce((s, r) => s + r.leads, 0);
+
+  if (!n){ el.classList.remove('show'); el.innerHTML = ''; return; }
+
+  el.innerHTML = '<b>' + fmt(n) + ' of ' + fmt(state.payload.totals.all) +
+    ' leads here fall into Other because GA4 labelled them ' +
+    unattributed.map(r => esc(r.channel)).join(' / ') + '.</b> ' +
+    'That isn\'t a traffic source — it means GA4 couldn\'t tie the lead to any acquisition at all, so it can\'t tell Direct from Paid for these. ' +
+    (state.payload.crmAvailable
+      ? 'Switch to CRM source for the value GoHighLevel recorded at submission time.'
+      : 'GoHighLevel did record a real source for these. The CRM source toggle lights up once lead_source is sent from n8n and registered in GA4.');
+  el.classList.add('show');
+}
+
 function renderCurrent(){
   document.getElementById('upgradeNotice').classList.toggle('show', !!state.payload.legacy);
   updateAttrButtons();
+  renderAttributionNotice();
   renderStats();
   renderTable();
   renderCampaigns();
@@ -855,6 +887,10 @@ function prettyRange(a, b){
 function daysBetween(a, b){
   return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
 }
+function daysLabel(a, b){
+  const n = daysBetween(a, b) + 1;
+  return n + (n === 1 ? ' day selected.' : ' days selected.');
+}
 
 const rangePicker = document.getElementById('rangePicker');
 const rangeStart = document.getElementById('rangeStart');
@@ -910,7 +946,7 @@ function applyCustomRange(){
     setRangeMsg(verdict.text, 'err');
     return;
   }
-  setRangeMsg(verdict ? verdict.text : (daysBetween(start, end) + 1) + ' days selected.', verdict ? 'warn' : null);
+  setRangeMsg(verdict ? verdict.text : daysLabel(start, end), verdict ? 'warn' : null);
   loadPeriod('custom', start + '|' + end, prettyRange(start, end));
 }
 
@@ -925,7 +961,7 @@ customBtn.addEventListener('click', () => {
   input.addEventListener('change', () => {
     if (!rangeStart.value || !rangeEnd.value) return setRangeMsg('');
     const verdict = checkRange(rangeStart.value, rangeEnd.value);
-    setRangeMsg(verdict ? verdict.text : (daysBetween(rangeStart.value, rangeEnd.value) + 1) + ' days selected.',
+    setRangeMsg(verdict ? verdict.text : daysLabel(rangeStart.value, rangeEnd.value),
                 verdict ? (verdict.pass ? 'warn' : 'err') : null);
   });
   input.addEventListener('keydown', e => { if (e.key === 'Enter') applyCustomRange(); });
