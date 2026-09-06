@@ -240,6 +240,8 @@
       </div>
       <p><b style="color:var(--text)">This visit</b> vs. <b style="color:var(--text)">Ever acquired</b>: the first uses the channel of the specific visit the lead happened in; the second uses however this browser was first ever acquired, even if that was months earlier. They can legitimately disagree — someone can be organically acquired long ago and still click a paid ad on the visit that finally converts.</p>
       <p><b style="color:var(--text)">generate_lead vs form_submit</b>: these two fire on the same submission, so the counts should track each other closely. A form_submit with no matching lead usually means the lead tag didn't fire — a broken selector, a validation bounce, or a form that isn't tagged yet. Both events are recent additions to the property, so treat any period that starts before they were installed as partial.</p>
+      <p><b style="color:var(--text)">Direct is not the same as Unassigned.</b> Direct means GA4 saw a real session that arrived with no referrer. Unassigned means GA4 couldn't tie the event to any acquisition at all — normally a broken link between the server-side lead and the browsing session it belongs to. Direct now has its own column so the two stop looking alike.</p>
+      <p><b style="color:var(--text)">Why the pages table can look lopsided:</b> generate_lead is sent server-side, so unless the payload includes page_location, GA4 has no page to file it under and it lands in "(not set)". form_submit fires in the browser and will show the real path. All the forms on one page and all the leads under "(not set)" is that gap, not a reporting fault.</p>
       <p>"(not set)" means the lead came through without a city selected on the form — worth a look if that count is climbing. On campaign rows it means the visit carried no campaign parameter.</p>
     </details>
   </footer>
@@ -554,14 +556,18 @@ function renderChannels(){
         <th>GA4 channel</th><th>Bucket</th><th class="num">Leads</th><th class="num">Forms</th><th class="num">Share</th>
       </tr></thead>
       <tbody>
-        ${rows.map(r => `
+        ${rows.map(r => {
+          const unassigned = r.channel === 'Unassigned' || r.channel === '(not set)';
+          return `
           <tr class="row">
-            <td><span class="nm">${esc(r.channel)}</span></td>
+            <td><span class="nm">${esc(r.channel)}</span>${unassigned
+              ? ' <span class="gap" title="GA4 could not tie these events to any acquisition — usually a broken session link, not real traffic">couldn\'t be attributed</span>' : ''}</td>
             <td><span class="chip ${esc(r.bucket)}">${esc(r.bucket)}</span></td>
             <td class="num total">${fmt(r.leads)}</td>
             <td class="num">${gapCell(r.leads, r.formSubmit)}</td>
             <td class="num muted">${pct(r.leads, totalLeads)}%</td>
-          </tr>`).join('')}
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>`;
 }
