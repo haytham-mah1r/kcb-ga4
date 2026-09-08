@@ -161,6 +161,7 @@
 
   .gap{font-family:var(--font-mono);font-size:10px;color:var(--warn);}
   .gap.zero{color:var(--text-dimmer);}
+  .assumed-mark{color:var(--warn);margin-left:2px;cursor:help;}
   .table-empty{padding:36px 20px;text-align:center;color:var(--text-dimmer);font-size:13px;line-height:1.7;}
 
   /* ---------------- footer ---------------- */
@@ -403,6 +404,9 @@ function normalize(raw){
     BUCKETS.forEach(b => { t[b.key] = Number(t[b.key] || 0); });
   });
   p.totals.all = Number(p.totals.all || 0);
+  p.totals.assumed = p.totals.assumed || { session: 0, firstUser: 0, crm: 0 };
+  ['session','firstUser','crm'].forEach(s => { p.totals.assumed[s] = Number(p.totals.assumed[s] || 0); });
+  p.unattributedBucket = p.unattributedBucket || 'other';
   if (p.totals.formSubmit === undefined){ p.totals.formSubmit = null; legacy = true; }
 
   p.cities = (p.cities || []).map(c => {
@@ -412,6 +416,8 @@ function normalize(raw){
       BUCKETS.forEach(b => { s[b.key] = Number(s[b.key] || 0); });
     });
     c.total = Number(c.total || 0);
+    c.assumed = c.assumed || { session: 0, firstUser: 0, crm: 0 };
+    c.crmTotal = Number(c.crmTotal || 0);
     if (c.formSubmit === undefined) c.formSubmit = null;
     c.campaigns = c.campaigns || [];
     c.crmCampaigns = c.crmCampaigns || [];
@@ -426,6 +432,9 @@ function normalize(raw){
   });
   p.pages = p.pages || [];
   p.crmAvailable = !!p.crmAvailable;
+  p.crmOrigin = p.crmOrigin || null;
+  p.crmTotalLeads = Number(p.crmTotalLeads || 0);
+  p.gclidReclassified = Number(p.gclidReclassified || 0);
   if (!p.campaigns.session.length && !p.channels.session.length && !p.pages.length) legacy = true;
   p.legacy = legacy;
   return p;
@@ -434,25 +443,51 @@ function normalize(raw){
 /* =========================================================
    5. STAT CARDS
 ========================================================= */
+// Under the CRM scope the denominator is GoHighLevel's submission
+// count, not GA4's event count. They are different measurements of the
+// same thing and mixing them would make every percentage wrong.
+function scopeTotal(){
+  return state.attr === 'crm' && state.payload.crmTotalLeads
+    ? state.payload.crmTotalLeads
+    : state.payload.totals.all;
+}
+function cityTotal(c){
+  return state.attr === 'crm' ? (c.crmTotal || 0) : c.total;
+}
+
 function renderStats(){
   const t = state.payload.totals[state.attr];
-  const all = state.payload.totals.all;
+  const all = scopeTotal();
   const forms = state.payload.totals.formSubmit;
+  const assumed = state.payload.totals.assumed[state.attr] || 0;
+  const assumedBucket = state.payload.unattributedBucket;
 
-  const pairLine = forms == null
-    ? '&nbsp;'
-    : eventName('form') + ' ' + fmt(forms) + (forms ? ' · ' + pct(all, forms) + '% paired' : '');
+  const isCrm = state.attr === 'crm';
+  const pairLine = isCrm
+    ? 'counted by GoHighLevel'
+    : (forms == null ? '&nbsp;'
+       : eventName('form') + ' ' + fmt(forms) + (forms ? ' · ' + pct(all, forms) + '% paired' : ''));
 
   const cards = [
-    { label: eventName('lead'), n: all, color: null, sub: pairLine },
-    ...BUCKETS.map(b => ({ label: b.label, n: t[b.key], color: b.color, sub: pct(t[b.key], all) + '% of leads' }))
+    { label: isCrm ? 'submissions' : eventName('lead'), n: all, color: null, sub: pairLine },
+    ...BUCKETS.map(b => {
+      // Only the bucket the fallback feeds carries inferred leads.
+      const inferred = (b.key === assumedBucket) ? assumed : 0;
+      return {
+        label: b.label,
+        n: t[b.key],
+        color: b.color,
+        sub: pct(t[b.key], all) + '% of leads' + (inferred ? ' · ' + fmt(inferred) + ' assumed' : ''),
+        flag: !!inferred
+      };
+    })
   ];
 
   document.getElementById('stats').innerHTML = cards.map(c => `
     <div class="stat-card">
       <div class="lbl">${c.color ? `<span class="dot" style="background:${c.color}"></span>` : ''}${c.label}</div>
       <div class="n">${fmt(c.n)}</div>
-      <div class="pct">${c.sub}</div>
+      <div class="pct${c.flag ? ' gap' : ''}"${c.flag ? ' title="GA4 couldn\'t attribute these leads. They\'re counted here by rule, not measurement."' : ''}>${c.sub}</div>
     </div>
   `).join('');
 }
@@ -499,7 +534,8 @@ function renderTable(){
 
   cities.forEach((c, i) => {
     const split = c[state.attr];
-    const total = c.total || 1;
+    const rowTotal = cityTotal(c);
+    const total = rowTotal || 1;
     const isUnset = c.city === '(not set)';
     const camps = state.attr === 'session' ? (c.campaigns || [])
                 : state.attr === 'crm'     ? (c.crmCampaigns || [])
@@ -522,9 +558,15 @@ function renderTable(){
             ? `<div class="bar-seg" style="width:${pct(split[b.key], total)}%;background:${b.color}"></div>` : '').join('')}
         </div>
       </td>
-      ${BUCKETS.map(b => `<td class="num" style="color:${b.color}">${split[b.key] ? fmt(split[b.key]) : '—'}</td>`).join('')}
-      <td class="num total">${fmt(c.total)}</td>
-      <td class="num">${gapCell(c.total, c.formSubmit)}</td>
+      ${BUCKETS.map(b => {
+        const inferred = (b.key === state.payload.unattributedBucket) ? (c.assumed[state.attr] || 0) : 0;
+        const cell = split[b.key] ? fmt(split[b.key]) : '—';
+        return `<td class="num" style="color:${b.color}"${inferred
+          ? ` title="${inferred} of these ${esc(b.label.toLowerCase())} leads were unattributed in GA4 and assigned by rule"` : ''}>${cell}${
+          inferred ? '<span class="assumed-mark">*</span>' : ''}</td>`;
+      }).join('')}
+      <td class="num total">${fmt(rowTotal)}</td>
+      <td class="num">${state.attr === 'crm' ? '<span class="gap zero">—</span>' : gapCell(c.total, c.formSubmit)}</td>
     `;
     tbody.appendChild(tr);
 
@@ -616,7 +658,7 @@ function renderChannels(){
   const rows = state.payload.channels[state.attr] || [];
   const isCrm = state.attr === 'crm';
   document.getElementById('channelHint').textContent = isCrm
-    ? 'exactly as GoHighLevel worded it, before bucketing'
+    ? "GoHighLevel's own wording, before bucketing"
     : "GA4's own channel grouping, before it gets folded into four buckets";
   if (!rows.length){
     wrap.innerHTML = '<div class="table-empty">' +
@@ -625,7 +667,7 @@ function renderChannels(){
         : 'No channel data for this period.') + '</div>';
     return;
   }
-  const totalLeads = rows.reduce((s, r) => s + r.leads, 0);
+  const totalLeads = rows.reduce((s, r) => s + r.leads, 0) || 1;
   wrap.innerHTML = `
     <table class="leads" style="min-width:520px">
       <thead><tr>
@@ -689,8 +731,9 @@ function updateAttrButtons(){
   const available = !!state.payload.crmAvailable;
   crmBtn.disabled = !available;
   crmBtn.title = available
-    ? 'The source GoHighLevel recorded on the submission itself'
-    : 'Needs the lead_source custom dimension registered in GA4 and sent from n8n';
+    ? 'The source GoHighLevel recorded on the submission itself' +
+      (state.payload.crmOrigin === 'ghl' ? ' — read live from the GHL API' : '')
+    : 'Needs the GoHighLevel API configured in the Apps Script (GHL_LOCATION_ID + setGhlToken)';
 
   // The CRM value is captured by the system that actually saw the click,
   // so when it's there it's the better default. Only auto-switch once,
@@ -714,20 +757,51 @@ function eventName(which){
 // minor," so it gets said out loud rather than left to inference.
 function renderAttributionNotice(){
   const el = document.getElementById('attributionNotice');
-  const rows = state.payload.channels[state.attr] || [];
-  const unattributed = state.attr === 'crm' ? [] :
-    rows.filter(r => r.channel === 'Unassigned' || r.channel === '(not set)');
+  const p = state.payload;
+
+  // Under the CRM scope there's nothing unattributed to warn about —
+  // but a gap against GA4's count is worth stating plainly.
+  if (state.attr === 'crm'){
+    const gap = p.crmTotalLeads - p.totals.all;
+    const bits = [];
+    if (p.crmOrigin === 'ghl'){
+      bits.push('<b>Read straight from GoHighLevel</b> — this is the source GHL recorded on each submission, not GA4\'s reconstruction of it.');
+    }
+    if (gap > 0){
+      bits.push('GHL has ' + fmt(p.crmTotalLeads) + ' submissions here against ' + fmt(p.totals.all) +
+        ' ' + eventName('lead') + ' events in GA4, so ' + fmt(gap) + ' never made it through the pipeline into GA4.');
+    } else if (gap < 0){
+      bits.push('GA4 has ' + fmt(Math.abs(gap)) + ' more ' + eventName('lead') +
+        ' events than GHL has submissions in this window — usually duplicate sends or leftover debug traffic.');
+    }
+    if (p.gclidReclassified){
+      bits.push(fmt(p.gclidReclassified) + ' submission(s) carried a Google click ID without GHL calling them paid, and were counted as Paid here.');
+    }
+    if (!bits.length){ el.classList.remove('show'); el.innerHTML = ''; return; }
+    el.innerHTML = bits.join(' ');
+    el.classList.add('show');
+    return;
+  }
+
+  const rows = p.channels[state.attr] || [];
+  const unattributed = rows.filter(r => r.channel === 'Unassigned' || r.channel === '(not set)');
   const n = unattributed.reduce((s, r) => s + r.leads, 0);
 
   if (!n){ el.classList.remove('show'); el.innerHTML = ''; return; }
 
-  el.innerHTML = '<b>' + fmt(n) + ' of ' + fmt(state.payload.totals.all) +
-    ' leads here fall into Other because GA4 labelled them ' +
-    unattributed.map(r => esc(r.channel)).join(' / ') + '.</b> ' +
-    'That isn\'t a traffic source — it means GA4 couldn\'t tie the lead to any acquisition at all, so it can\'t tell Direct from Paid for these. ' +
-    (state.payload.crmAvailable
-      ? 'Switch to CRM source for the value GoHighLevel recorded at submission time.'
-      : 'GoHighLevel did record a real source for these. The CRM source toggle lights up once lead_source is sent from n8n and registered in GA4.');
+  const bucket = p.unattributedBucket;
+  const label = (BUCKETS.filter(b => b.key === bucket)[0] || {}).label || 'Other';
+  const names = unattributed.map(r => esc(r.channel)).join(' / ');
+  const crmLine = p.crmAvailable
+    ? 'Switch to CRM source for what GoHighLevel recorded at submission time.'
+    : 'GoHighLevel recorded a real source for these. Point the script at the GHL API to use it.';
+
+  el.innerHTML = bucket === 'other'
+    ? '<b>' + fmt(n) + ' of ' + fmt(p.totals.all) + ' leads here fall into Other because GA4 labelled them ' + names + '.</b> ' +
+      'That isn\'t a traffic source — it means GA4 couldn\'t tie the lead to any acquisition at all. ' + crmLine
+    : '<b>' + fmt(n) + ' of ' + fmt(p.totals.all) + ' leads in ' + label + ' are counted there by rule, not by measurement.</b> ' +
+      'GA4 labelled them ' + names + ', meaning it saw no acquisition data at all — usually a lead sent without a usable client ID, which depends on the page rather than the visitor. ' +
+      'Some of these may have been paid clicks. ' + crmLine;
   el.classList.add('show');
 }
 
