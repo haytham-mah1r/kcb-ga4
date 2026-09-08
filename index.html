@@ -463,10 +463,21 @@ function renderStats(){
   const assumedBucket = state.payload.unattributedBucket;
 
   const isCrm = state.attr === 'crm';
-  const pairLine = isCrm
-    ? 'counted by GoHighLevel'
-    : (forms == null ? '&nbsp;'
-       : eventName('form') + ' ' + fmt(forms) + (forms ? ' · ' + pct(all, forms) + '% paired' : ''));
+  // A "% paired" figure goes over 100 the moment leads outnumber forms,
+  // which reads as nonsense. State the direction of the gap instead.
+  let pairLine;
+  if (isCrm){
+    pairLine = 'counted by GoHighLevel';
+  } else if (forms == null){
+    pairLine = '&nbsp;';
+  } else {
+    const d = all - forms;
+    pairLine = eventName('form') + ' ' + fmt(forms) + ' · ' + (
+      d === 0 ? 'matched' :
+      d > 0   ? fmt(d) + ' lead' + (d === 1 ? '' : 's') + ' with no form' :
+                fmt(-d) + ' form' + (d === -1 ? '' : 's') + ' with no lead'
+    );
+  }
 
   const cards = [
     { label: isCrm ? 'submissions' : eventName('lead'), n: all, color: null, sub: pairLine },
