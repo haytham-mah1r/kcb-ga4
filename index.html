@@ -86,7 +86,6 @@
   .entry:first-child{padding-top:22px;}
   .entry-top{display:flex;align-items:baseline;justify-content:space-between;gap:16px;}
   .place{font-family:var(--serif);font-size:25px;font-weight:400;letter-spacing:-.01em;line-height:1.2;}
-  .within{font-size:12px;color:var(--ink-faint);margin-top:5px;line-height:1.5;}
   .count{font-family:var(--serif);font-size:38px;font-weight:400;line-height:1;
     font-variant-numeric:lining-nums tabular-nums;letter-spacing:-.02em;}
   .count.none{color:#C6C8C4;}
@@ -107,6 +106,7 @@
   .summary{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
     flex-wrap:wrap;padding:20px 0 0;font-size:13px;color:var(--ink-soft);}
   .summary .lead-total{font-family:var(--serif);font-size:16px;color:var(--ink);}
+  .summary .elsewhere{color:var(--ink-faint);cursor:help;border-bottom:1px dotted var(--rule);}
 
   /* ---------- footnote ---------- */
   .foot{margin-top:26px;font-size:12px;line-height:1.7;color:var(--ink-faint);}
@@ -189,11 +189,11 @@
 ========================================================= */
 const LIVE_DATA_URL = "https://script.google.com/macros/s/AKfycbwMw3AH2gtuOkya2wlQ4QSZDXPlNY1aUYwyHYVsi9YUukpFESgnVvLRStWdj-yyXQD8/exec";
 
-// The two places that get their own line. Everything else in the
-// province is summed into one row, so the sheet always reads as three
-// entries no matter how many towns show up in a given month.
-const FEATURED_CITIES = ['Red Deer', 'Cochrane'];
-const REST_LABEL = 'Alberta';
+// The three places worth watching. Anything else that turns up is
+// summed into a single quiet line under the totals rather than given a
+// row of its own — the sheet always reads as these three entries, but
+// the figures still add up to every lead that came in.
+const FEATURED_CITIES = ['Red Deer', 'Cochrane', 'Calgary'];
 
 // Must match the Apps Script constant and GA4's reporting timezone.
 const REPORTING_TIMEZONE = 'America/Edmonton';
@@ -252,9 +252,9 @@ const grandTotal = () => state.attr === 'crm'
   : (state.payload.totals.all || 0);
 
 /* =========================================================
-   THREE ROWS, ALWAYS
+   THREE ROWS, ALWAYS — plus whatever fell outside them
 ========================================================= */
-function scheduleRows(){
+function buildView(){
   const cities = state.payload.cities || [];
   const claimed = {};
   const rows = FEATURED_CITIES.map(name => {
@@ -263,36 +263,32 @@ function scheduleRows(){
     return {
       label: name,
       split: match ? match[state.attr] : emptySplit(),
-      total: match ? cityCount(match) : 0,
-      within: ''
+      total: match ? cityCount(match) : 0
     };
   });
 
-  const rest = { label: REST_LABEL, split: emptySplit(), total: 0, within: '' };
-  const towns = [];
-  let noCity = 0;
+  // Not shown as a row, but never silently dropped: without this the
+  // three figures wouldn't add up to the total and the sheet would be
+  // quietly wrong.
+  const remainder = { total: 0, towns: [], noCity: 0 };
   cities.forEach(c => {
     if (claimed[c.city]) return;
     const n = cityCount(c);
     if (!n) return;
-    Object.keys(rest.split).forEach(k => { rest.split[k] += (c[state.attr][k] || 0); });
-    rest.total += n;
-    if (c.city === '(not set)') noCity += n; else towns.push({ name: c.city, n: n });
+    remainder.total += n;
+    if (c.city === '(not set)') remainder.noCity += n;
+    else remainder.towns.push({ name: c.city, n: n });
   });
+  remainder.towns.sort((a, b) => b.n - a.n);
 
-  towns.sort((a, b) => b.n - a.n);
-  const parts = towns.map(t => t.name + ' ' + t.n);
-  if (noCity) parts.push(noCity + ' with no city given');
-  rest.within = parts.join(', ');
-  rows.push(rest);
-  return rows;
+  return { rows: rows, remainder: remainder };
 }
 
 /* =========================================================
    RENDER
 ========================================================= */
-function renderSchedule(){
-  const rows = scheduleRows();
+function renderSchedule(view){
+  const rows = view.rows;
   const anyOther = rows.some(r => r.split.other > 0);
   const channels = anyOther ? CHANNELS.concat([OTHER]) : CHANNELS;
 
@@ -310,10 +306,7 @@ function renderSchedule(){
     return `
       <div class="entry">
         <div class="entry-top">
-          <div>
-            <div class="place">${esc(r.label)}</div>
-            ${r.within ? `<div class="within">${esc(r.within)}</div>` : ''}
-          </div>
+          <div class="place">${esc(r.label)}</div>
           <div class="count${r.total ? '' : ' none'}">${fmt(r.total)}</div>
         </div>
         ${bar}
@@ -322,14 +315,23 @@ function renderSchedule(){
   }).join('');
 }
 
-function renderSummary(){
+function renderSummary(view){
   const total = grandTotal();
   const t = state.payload.totals[state.attr];
   const noun = state.attr === 'crm' ? 'form submission' : 'lead';
   const counted = fmt(total) + ' ' + noun + (total === 1 ? '' : 's');
   const parts = CHANNELS.map(ch => ch.label.toLowerCase() + ' ' + fmt(t[ch.key])).join(', ');
+
+  const r = view.remainder;
+  let aside = '';
+  if (r.total){
+    const where = r.towns.map(x => x.name + ' ' + x.n);
+    if (r.noCity) where.push(r.noCity + ' with no city given');
+    aside = `<span class="elsewhere" title="${esc(where.join(', '))}">${fmt(r.total)} from elsewhere</span>`;
+  }
+
   document.getElementById('summary').innerHTML =
-    `<span class="lead-total">${counted}</span><span>${parts}</span>`;
+    `<span class="lead-total">${counted}</span>${aside}<span>${parts}</span>`;
 }
 
 function renderNote(){
@@ -371,15 +373,15 @@ function renderFootnotes(){
         ? 'Counts come from GA4, using the channel of the visit the lead happened in. GA4 can only classify a visit it managed to link the lead to.'
         : 'Counts come from GA4, using how the browser was first acquired — which may have been months before this lead.');
   document.getElementById('footAlberta').textContent =
-    REST_LABEL + ' covers every submission outside ' + FEATURED_CITIES.join(' and ') +
-    '. The towns making it up are listed under that heading.';
+    'Only ' + FEATURED_CITIES.join(', ') + ' get their own line. Anything from another town, or a form sent without a city, is counted in the totals and noted as "from elsewhere" — hover it to see where.';
 }
 
 function renderAll(){
   updateSourceSwitch();
+  const view = buildView();
   renderNote();
-  renderSchedule();
-  renderSummary();
+  renderSchedule(view);
+  renderSummary(view);
   renderFootnotes();
 }
 
