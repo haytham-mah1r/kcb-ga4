@@ -3,498 +3,419 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KCB Design Build · Leads by city</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Conversions</title>
 <style>
   /* ============================================================
-     A renovation company's lead schedule, not a SaaS dashboard.
-     Laid out like a drawing schedule: hairline rules instead of
-     cards, city names in a text serif, counts set large and right
-     aligned so the eye runs down one column of figures.
-
-     Channel colours are drawn from the trade — slate, forest,
-     brass — so they sit together rather than competing the way
-     signal red/amber/green would.
+     Styled to sit alongside Agency Analytics' own report widgets:
+     white cards on a light grey canvas, a hairline border, a small
+     mark + label top-left, a grey badge top-right, and the figure
+     set large and centred in mid-grey. One "headline" card gets a
+     soft tint to match the way AA highlights its primary metric.
   ============================================================ */
   :root{
-    --paper:#FAFAF8;
-    --ink:#1B1E20;
-    --ink-soft:#5A6166;
-    --ink-faint:#949A9E;
-    --rule:#E4E3DE;
-    --rule-soft:#EFEEEA;
+    --canvas:#F4F5F7;
+    --panel:#FFFFFF;
+    --line:#E3E5E9;
+    --line-soft:#EDEFF2;
+    --figure:#4A4A4A;
+    --label:#6C7684;
+    --muted:#98A0AB;
+    --link:#2F7DD1;
+    --shadow:0 1px 2px rgba(16,24,40,.04);
 
-    --direct:#4A5A6B;
-    --organic:#3F6B54;
-    --paid:#B07526;
-    --other:#9A9691;
+    --direct:#4E7BB5;
+    --organic:#4B9E6B;
+    --paid:#E08B3C;
+    --other:#A2A9B4;
+    --headline-bg:#E9F7EE;
+    --headline-line:#CFEBD9;
 
-    --serif:'Newsreader',Georgia,serif;
-    --sans:'Instrument Sans',system-ui,-apple-system,sans-serif;
+    --font:'Roboto',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);
-    font-family:var(--sans);-webkit-font-smoothing:antialiased;}
-  body{padding:28px 0 44px;}
-  .sheet{max-width:760px;margin:0 auto;padding:0 26px;}
+  html,body{margin:0;padding:0;background:var(--canvas);font-family:var(--font);color:var(--figure);
+    -webkit-font-smoothing:antialiased;}
+  body{padding:14px 0 30px;}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 14px;}
 
-  /* ---------- masthead ---------- */
-  .masthead{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:22px;}
-  h1{font-family:var(--serif);font-size:31px;font-weight:400;letter-spacing:-.015em;margin:0 0 3px;line-height:1.1;}
-  .period-label{font-size:13px;color:var(--ink-soft);margin:0;}
-  .feed{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-faint);white-space:nowrap;}
-  .feed::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ink-faint);flex:none;}
-  .feed.live::before{background:var(--organic);}
-  .feed.stale::before{background:var(--paid);}
-  .feed.busy::before{background:var(--ink-faint);animation:pulse 1.1s ease-in-out infinite;}
-  @keyframes pulse{50%{opacity:.25;}}
+  /* ---------- toolbar ---------- */
+  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px;}
+  .toolbar-left{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .tabs{display:flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:3px;}
+  .tabs button{font-family:var(--font);font-size:13px;color:var(--label);background:none;border:none;
+    padding:6px 14px;border-radius:3px;cursor:pointer;line-height:1.4;white-space:nowrap;}
+  .tabs button:hover:not(.on){background:var(--canvas);color:var(--figure);}
+  .tabs button.on{background:#EEF3F9;color:var(--link);font-weight:500;}
 
-  /* ---------- controls: quiet text, underline for state ---------- */
-  .controls{display:flex;gap:26px;flex-wrap:wrap;align-items:baseline;
-    padding-bottom:13px;border-bottom:1px solid var(--rule);}
-  .switch{display:flex;gap:15px;flex-wrap:wrap;align-items:baseline;}
-  .switch button{font-family:var(--sans);font-size:13px;font-weight:400;color:var(--ink-faint);
-    background:none;border:none;padding:2px 0;cursor:pointer;line-height:1.4;
-    border-bottom:1.5px solid transparent;transition:color .12s ease;}
-  .switch button:hover:not(:disabled){color:var(--ink);}
-  .switch button.on{color:var(--ink);font-weight:500;border-bottom-color:var(--ink);}
-  .switch button:disabled{color:#C4C7C4;cursor:not-allowed;}
-  .switch .sep{width:1px;align-self:stretch;background:var(--rule);}
+  .copylink{display:inline-flex;align-items:center;gap:6px;font-family:var(--font);font-size:12.5px;
+    color:var(--label);background:var(--panel);border:1px solid var(--line);border-radius:4px;
+    padding:7px 12px;cursor:pointer;white-space:nowrap;}
+  .copylink:hover{color:var(--figure);border-color:#C9CED6;}
+  .copylink svg{flex:none;}
+  .copylink.done{color:#2F7350;border-color:#CFEBD9;background:#F1FBF4;}
+
+  .periods{display:flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:3px;}
+  .periods button{font-family:var(--font);font-size:12.5px;color:var(--label);background:none;border:none;
+    padding:6px 11px;border-radius:3px;cursor:pointer;white-space:nowrap;}
+  .periods button:hover:not(.on){background:var(--canvas);color:var(--figure);}
+  .periods button.on{background:#EEF3F9;color:var(--link);font-weight:500;}
+
+  .status{font-size:11.5px;color:var(--muted);display:inline-flex;align-items:center;gap:5px;}
+  .status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--muted);}
+  .status.live::before{background:#4B9E6B;}
+  .status.bad::before{background:#D0743C;}
 
   /* ---------- date range ---------- */
-  .range{display:none;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:15px 0 0;}
-  .range.open{display:flex;}
-  .range label{display:block;font-size:11.5px;color:var(--ink-faint);margin-bottom:4px;}
-  .range input{font-family:var(--sans);font-size:13px;color:var(--ink);padding:6px 8px;
-    background:#fff;border:1px solid var(--rule);border-radius:3px;}
-  .range button{font-family:var(--sans);font-size:13px;color:var(--paper);background:var(--ink);
-    border:none;border-radius:3px;padding:7px 14px;cursor:pointer;}
-  .range button:hover{background:#33383B;}
-  .range .msg{font-size:12px;color:var(--ink-faint);flex:1 1 190px;line-height:1.5;}
-  .range .msg.bad{color:#A8452C;}
+  .daterange{display:none;gap:10px;align-items:flex-end;flex-wrap:wrap;background:var(--panel);
+    border:1px solid var(--line);border-radius:4px;padding:12px 14px;margin-bottom:12px;}
+  .daterange.open{display:flex;}
+  .daterange label{display:block;font-size:11.5px;color:var(--label);margin-bottom:4px;}
+  .daterange input{font-family:var(--font);font-size:13px;color:var(--figure);padding:6px 8px;
+    border:1px solid var(--line);border-radius:3px;background:#fff;}
+  .daterange button{font-family:var(--font);font-size:13px;color:#fff;background:var(--link);border:none;
+    border-radius:3px;padding:8px 15px;cursor:pointer;}
+  .daterange button:hover{background:#2569B4;}
+  .daterange .err{font-size:12px;color:#C0562C;align-self:center;}
 
-  /* ---------- the schedule ---------- */
-  .schedule{margin:6px 0 0;}
-  .entry{padding:24px 0 20px;border-bottom:1px solid var(--rule);}
-  .entry:first-child{padding-top:22px;}
-  .entry-top{display:flex;align-items:baseline;justify-content:space-between;gap:16px;}
-  .place{font-family:var(--serif);font-size:25px;font-weight:400;letter-spacing:-.01em;line-height:1.2;}
-  .count{font-family:var(--serif);font-size:38px;font-weight:400;line-height:1;
-    font-variant-numeric:lining-nums tabular-nums;letter-spacing:-.02em;}
-  .count.none{color:#C6C8C4;}
+  /* ---------- metric cards ---------- */
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
+  .metric{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:11px 13px 20px;
+    display:flex;flex-direction:column;min-height:132px;box-shadow:var(--shadow);}
+  .metric.headline{background:var(--headline-bg);border-color:var(--headline-line);}
+  .metric-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .metric-name{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--label);}
+  .mark{flex:none;display:inline-flex;width:16px;height:16px;border-radius:4px;overflow:hidden;}
+  .sq{width:9px;height:9px;border-radius:2px;flex:none;}
+  .badge{font-size:11px;color:var(--label);background:#EDEFF2;border-radius:3px;padding:2px 7px;line-height:1.6;}
+  .metric.headline .badge{background:#DBF0E2;}
+  .metric-figure{flex:1;display:flex;align-items:center;justify-content:center;
+    font-size:44px;font-weight:700;letter-spacing:-.02em;line-height:1;padding-top:8px;}
+  .metric-figure.zero{color:#C9CDD3;}
+  @media (max-width:860px){ .metrics{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:460px){ .metrics{grid-template-columns:1fr;} }
 
-  .measure{display:flex;gap:2px;height:5px;margin:15px 0 12px;}
-  .measure span{display:block;border-radius:1px;}
-  .measure.empty{background:var(--rule-soft);border-radius:1px;}
+  /* ---------- panel ---------- */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;overflow:hidden;box-shadow:var(--shadow);}
+  .panel-top{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:11px 14px;border-bottom:1px solid var(--line);}
+  .panel-top h2{font-size:13px;font-weight:500;color:var(--label);margin:0;}
+  .panel-top .count{font-size:11.5px;color:var(--muted);}
 
-  .split{display:flex;gap:26px;flex-wrap:wrap;}
-  .part{display:flex;align-items:baseline;gap:7px;font-size:13px;color:var(--ink-soft);}
-  .part i{width:7px;height:7px;border-radius:1px;flex:none;align-self:center;}
-  .part b{font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;}
-  .part.nil{color:var(--ink-faint);}
-  .part.nil b{color:var(--ink-faint);font-weight:400;}
-  .part.nil i{opacity:.35;}
-
-  /* ---------- summary ---------- */
-  .summary{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
-    flex-wrap:wrap;padding:20px 0 0;font-size:13px;color:var(--ink-soft);}
-  .summary .lead-total{font-family:var(--serif);font-size:16px;color:var(--ink);}
-  .summary .elsewhere{color:var(--ink-faint);cursor:help;border-bottom:1px dotted var(--rule);}
-
-
-  .waiting{padding:60px 0;text-align:center;color:var(--ink-faint);font-size:13px;}
-
-  /* ---------- drill-down ---------- */
-  .place.link,.part.link{cursor:pointer;}
-  .place.link{border:none;background:none;padding:0;font:inherit;color:inherit;text-align:left;
-    border-bottom:1px solid transparent;transition:border-color .12s ease;}
-  .place.link:hover{border-bottom-color:var(--ink);}
-  .part.link{border:none;background:none;padding:0;font:inherit;}
-  .part.link:hover b,.part.link:hover{color:var(--ink);}
-  .part.link:hover i{outline:2px solid var(--rule);outline-offset:1px;}
-
-  .back{display:inline-flex;align-items:center;gap:7px;background:none;border:none;padding:0;
-    font-family:var(--sans);font-size:13px;color:var(--ink-faint);cursor:pointer;margin-bottom:18px;}
-  .back:hover{color:var(--ink);}
-  .back span{font-size:15px;line-height:1;}
-
-  .detail-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
-    padding-bottom:14px;border-bottom:1px solid var(--rule);}
-  .detail-head h2{font-family:var(--serif);font-size:25px;font-weight:400;margin:0;letter-spacing:-.01em;}
-  .detail-head .of{font-size:13px;color:var(--ink-faint);}
-
-  .record{display:flex;align-items:baseline;gap:18px;padding:15px 0;border-bottom:1px solid var(--rule-soft);}
-  .record .when{font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink);flex:none;width:132px;}
-  .record .when em{font-style:normal;color:var(--ink-faint);}
-  .record .how{flex:1 1 auto;min-width:0;font-size:13px;color:var(--ink-soft);}
-  .record .how i{display:inline-block;width:7px;height:7px;border-radius:1px;margin-right:7px;}
-  .record .extra{display:block;color:var(--ink-faint);font-size:12px;margin-top:3px;}
-  .record .where{flex:none;font-size:12.5px;color:var(--ink-faint);}
-  @media (max-width:560px){
-    .record{flex-wrap:wrap;gap:5px 14px;}
-    .record .when{width:auto;}
+  /* ---------- submissions ---------- */
+  .record{padding:14px;border-bottom:1px solid var(--line-soft);display:flex;gap:16px;align-items:flex-start;}
+  .record:last-child{border-bottom:none;}
+  .record:hover{background:#FAFBFC;}
+  .rec-main{flex:1 1 auto;min-width:0;}
+  .rec-name{font-size:14px;font-weight:500;color:var(--figure);margin-bottom:3px;}
+  .rec-service{font-size:12.5px;color:var(--label);margin-bottom:7px;}
+  .rec-msg{font-size:13px;line-height:1.6;color:#5A6169;white-space:pre-wrap;word-break:break-word;max-width:74ch;}
+  .rec-msg.empty{color:var(--muted);font-style:italic;}
+  .rec-side{flex:none;width:172px;text-align:right;}
+  .rec-when{font-size:12.5px;color:var(--label);margin-top:7px;font-variant-numeric:tabular-nums;}
+  .rec-extra{font-size:11.5px;color:var(--muted);margin-top:3px;}
+  .tag{display:inline-block;font-size:11px;padding:3px 8px;border-radius:3px;line-height:1.5;}
+  .tag.paid{background:#FBEEE1;color:#A2601F;}
+  .tag.organic{background:#E6F4EC;color:#2F7350;}
+  .tag.direct{background:#E9F0F8;color:#375F8C;}
+  .tag.other{background:#EDEFF2;color:#6C7684;}
+  @media (max-width:640px){
+    .record{flex-direction:column-reverse;gap:9px;}
+    .rec-side{width:auto;text-align:left;}
+    .rec-when{margin-top:5px;}
   }
 
-  :focus-visible{outline:2px solid var(--direct);outline-offset:3px;}
-  @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important;}}
-  @media (max-width:560px){
-    h1{font-size:26px;}
-    .place{font-size:21px;}
-    .count{font-size:31px;}
-    .split{gap:18px;}
-    .controls{gap:14px;}
-  }
+  .empty{padding:44px 16px;text-align:center;color:var(--muted);font-size:13px;}
+
+  :focus-visible{outline:2px solid var(--link);outline-offset:2px;}
 </style>
 </head>
 <body>
+<!-- shared gradient used by the small card mark, defined once so every
+     icon references the same id instead of minting its own defs block -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="markGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4E7BB5"/>
+      <stop offset="1" stop-color="#4B9E6B"/>
+    </linearGradient>
+  </defs>
+</svg>
 
-<div class="sheet">
-  <div class="masthead">
-    <div>
-      <h1>Leads by city</h1>
-      <p class="period-label" id="periodLabel">Loading</p>
+<div class="wrap">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div class="tabs" id="tabs"></div>
+      <button class="copylink" id="copyLink" type="button" title="Copy a link to this view for embedding elsewhere">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M8 12a4 4 0 0 0 5.66 0l2-2a4 4 0 1 0-5.66-5.66l-1 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M12 8a4 4 0 0 0-5.66 0l-2 2a4 4 0 1 0 5.66 5.66l1-1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <span id="copyLinkLabel">Copy link</span>
+      </button>
     </div>
-    <span class="feed" id="feed">Connecting</span>
-  </div>
-
-  <div class="controls">
-    <div class="switch" id="periodSwitch">
-      <button data-mode="month" data-value="0" type="button">This month</button>
+    <div class="periods" id="periods">
       <button data-mode="month" data-value="1" type="button">Last month</button>
-      <button data-mode="range" data-value="6" type="button">Six months</button>
-      <button data-mode="custom" id="customBtn" type="button">Pick dates</button>
-    </div>
-    <div class="sep" aria-hidden="true"></div>
-    <div class="switch" id="sourceSwitch" role="group" aria-label="Where the traffic source comes from">
-      <button data-attr="crm" id="crmBtn" type="button">GoHighLevel</button>
-      <button data-attr="session" type="button">This visit</button>
-      <button data-attr="firstUser" type="button">First visit</button>
+      <button data-mode="month" data-value="0" type="button">This month</button>
+      <button data-mode="range" data-value="6" type="button">6 months</button>
+      <button data-mode="custom" id="customBtn" type="button">Custom</button>
+      <span class="status" id="status" style="padding:6px 10px;">Loading</span>
     </div>
   </div>
 
-  <div class="range" id="range">
-    <div>
-      <label for="from">From</label>
-      <input type="date" id="from">
-    </div>
-    <div>
-      <label for="to">To</label>
-      <input type="date" id="to">
-    </div>
-    <button id="apply" type="button">Show these dates</button>
-    <p class="msg" id="rangeMsg" role="status" aria-live="polite"></p>
+  <div class="daterange" id="daterange">
+    <div><label for="from">From</label><input type="date" id="from"></div>
+    <div><label for="to">To</label><input type="date" id="to"></div>
+    <button id="apply" type="button">Apply</button>
+    <span class="err" id="rangeErr"></span>
   </div>
 
-  <div id="sheetView">
-    <div class="schedule" id="schedule">
-      <div class="waiting">Loading leads</div>
-    </div>
-    <div class="summary" id="summary"></div>
-  </div>
-
-  <div id="detailView" hidden></div>
-
+  <div class="metrics" id="metrics"></div>
+  <div id="body"></div>
 </div>
 
 <script>
 /* =========================================================
    CONFIG
+   ---------------------------------------------------------
+   PER-CITY EMBEDS. Three ways to lock this page to one city,
+   checked in this order:
+     1. ?city=Red%20Deer on this page's own URL
+     2. FORCE_CITY below, for when the file is pasted rather
+        than linked
+     3. neither, which shows all three with tabs
+   A locked page hides the tabs entirely and reports only that
+   city's conversions — this is what makes a single HTML file into
+   three separate embeddable widgets. See the "Copy link" button in
+   the toolbar: select a tab, click it, and the URL for exactly that
+   view is on the clipboard, ready to paste into an iframe src.
 ========================================================= */
 const LIVE_DATA_URL = "https://script.google.com/macros/s/AKfycbwMw3AH2gtuOkya2wlQ4QSZDXPlNY1aUYwyHYVsi9YUukpFESgnVvLRStWdj-yyXQD8/exec";
+const ACCESS_KEY = "kcb-7f3a91c2";   // must match ACCESS_KEY in the Apps Script
 
-// The three places worth watching. Anything else that turns up is
-// summed into a single quiet line under the totals rather than given a
-// row of its own — the sheet always reads as these three entries, but
-// the figures still add up to every lead that came in.
-const FEATURED_CITIES = ['Red Deer', 'Cochrane', 'Calgary'];
+const CITIES = ['Red Deer', 'Cochrane', 'Calgary'];
+const FORCE_CITY = '';               // e.g. 'Red Deer' to pin this copy to one city
 
-// Must match the Apps Script constant and GA4's reporting timezone, so
-// the date picker can't offer a day the data doesn't reach yet.
 const REPORTING_TIMEZONE = 'America/Edmonton';
+const DEFAULT_PERIOD = { mode: 'month', value: 1 };   // last month, by default
 
 const CHANNELS = [
   { key: 'direct',  label: 'Direct',  color: 'var(--direct)'  },
   { key: 'organic', label: 'Organic', color: 'var(--organic)' },
   { key: 'paid',    label: 'Paid',    color: 'var(--paid)'    }
 ];
-// Referral, email and anything else. Shown only when it isn't zero, so
-// the usual reading stays down to three figures.
 const OTHER = { key: 'other', label: 'Other', color: 'var(--other)' };
+const ALL_CHANNELS = CHANNELS.concat([OTHER]);
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 const fmt = n => Number(n || 0).toLocaleString();
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const emptySplit = () => ({ direct: 0, organic: 0, paid: 0, other: 0 });
 
-const state = { attr: 'crm', attrChosen: false, payload: null, detail: null };
+const MARK = '<span class="mark" aria-hidden="true"><svg viewBox="0 0 20 20" width="16" height="16">'
+  + '<rect width="20" height="20" rx="5" fill="url(#markGrad)"/>'
+  + '<path d="M5 13.5 8.5 8l3 3.5L15 6" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+  + '</svg></span>';
+
+function lockedCity(){
+  const q = new URLSearchParams(location.search).get('city');
+  const wanted = (q || FORCE_CITY || '').trim();
+  if (!wanted) return null;
+  const hit = CITIES.filter(c => c.toLowerCase() === wanted.toLowerCase())[0];
+  return hit || null;
+}
+
+const LOCKED = lockedCity();
+const state = { tab: LOCKED || 'All', payload: null };
 
 /* =========================================================
-   NORMALISE
+   DATA
+   The feed is CRM conversions only — no analytics-session data,
+   no vendor names. Every number here traces back to a real
+   conversion your CRM recorded.
 ========================================================= */
 function normalize(raw){
   const p = JSON.parse(JSON.stringify(raw || {}));
-  p.totals = p.totals || {};
-  ['session','firstUser','crm'].forEach(s => {
-    const t = p.totals[s] = Object.assign(emptySplit(), p.totals[s] || {});
-    Object.keys(t).forEach(k => { t[k] = Number(t[k] || 0); });
-  });
-  p.totals.all = Number(p.totals.all || 0);
-  p.crmTotalLeads = Number(p.crmTotalLeads || 0);
-  p.crmAvailable = !!p.crmAvailable;
-  p.unattributedBucket = p.unattributedBucket || 'other';
-  p.totals.assumed = Object.assign({ session:0, firstUser:0, crm:0 }, p.totals.assumed || {});
-
-  p.cities = (p.cities || []).map(c => {
-    ['session','firstUser','crm'].forEach(s => {
-      c[s] = Object.assign(emptySplit(), c[s] || {});
-      Object.keys(c[s]).forEach(k => { c[s][k] = Number(c[s][k] || 0); });
-    });
-    c.total = Number(c.total || 0);
-    c.crmTotal = Number(c.crmTotal || 0);
-    return c;
-  });
+  p.connected = raw && raw.connected !== false;
+  p.totals = Object.assign(emptySplit(), p.totals || {});
+  p.totalConversions = Number(p.totalConversions || 0);
   p.submissions = p.submissions || [];
-  p.channels = p.channels || {};
-  ['session','firstUser','crm'].forEach(s => { p.channels[s] = p.channels[s] || []; });
   return p;
 }
 
-// Under GoHighLevel the unit is a submission; under the GA4 views it's
-// a generate_lead event. Never mix the two in one denominator.
-const cityCount = c => state.attr === 'crm' ? c.crmTotal : c.total;
-const grandTotal = () => state.attr === 'crm'
-  ? (state.payload.crmTotalLeads || 0)
-  : (state.payload.totals.all || 0);
+function rowsFor(tab){
+  const subs = state.payload.submissions || [];
+  if (tab === 'All') return subs;
+  return subs.filter(s => String(s.city).toLowerCase() === tab.toLowerCase());
+}
 
-/* =========================================================
-   THREE ROWS, ALWAYS — plus whatever fell outside them
-========================================================= */
-function buildView(){
-  const cities = state.payload.cities || [];
-  const claimed = {};
-  const rows = FEATURED_CITIES.map(name => {
-    const match = cities.filter(c => c.city.toLowerCase() === name.toLowerCase())[0];
-    if (match) claimed[match.city] = true;
-    return {
-      label: name,
-      split: match ? match[state.attr] : emptySplit(),
-      total: match ? cityCount(match) : 0
-    };
-  });
+function splitFor(tab){
+  const split = emptySplit();
+  rowsFor(tab).forEach(s => { split[s.bucket] = (split[s.bucket] || 0) + 1; });
+  return split;
+}
 
-  // Not shown as a row, but never silently dropped: without this the
-  // three figures wouldn't add up to the total and the sheet would be
-  // quietly wrong.
-  const remainder = { total: 0, towns: [], noCity: 0 };
-  cities.forEach(c => {
-    if (claimed[c.city]) return;
-    const n = cityCount(c);
-    if (!n) return;
-    remainder.total += n;
-    if (c.city === '(not set)') remainder.noCity += n;
-    else remainder.towns.push({ name: c.city, n: n });
-  });
-  remainder.towns.sort((a, b) => b.n - a.n);
-
-  return { rows: rows, remainder: remainder };
+function totalFor(tab){
+  return rowsFor(tab).length;
 }
 
 /* =========================================================
    RENDER
 ========================================================= */
-function renderSchedule(view){
-  const rows = view.rows;
-  const anyOther = rows.some(r => r.split.other > 0);
-  const channels = anyOther ? CHANNELS.concat([OTHER]) : CHANNELS;
-
-  document.getElementById('schedule').innerHTML = rows.map(r => {
-    const bar = r.total
-      ? '<div class="measure">' + channels.map(ch => r.split[ch.key]
-          ? `<span style="width:${(r.split[ch.key] / r.total) * 100}%;background:${ch.color}"></span>` : '').join('') + '</div>'
-      : '<div class="measure empty"></div>';
-
-    // Only the GoHighLevel view has per-submission records behind it;
-    // GA4 reports counts, not rows, so nothing is clickable there.
-    const drillable = canDrill();
-
-    const split = channels.map(ch => {
-      const n = r.split[ch.key] || 0;
-      const open = drillable && n > 0;
-      const inner = `<i style="background:${ch.color}"></i>${ch.label} <b>${fmt(n)}</b>`;
-      return open
-        ? `<button class="part link" data-city="${esc(r.label)}" data-ch="${ch.key}"
-             title="See these ${esc(ch.label.toLowerCase())} submissions">${inner}</button>`
-        : `<span class="part${n ? '' : ' nil'}">${inner}</span>`;
-    }).join('');
-
-    const heading = (drillable && r.total)
-      ? `<button class="place link" data-city="${esc(r.label)}" title="See these submissions">${esc(r.label)}</button>`
-      : `<div class="place">${esc(r.label)}</div>`;
-
-    return `
-      <div class="entry">
-        <div class="entry-top">
-          ${heading}
-          <div class="count${r.total ? '' : ' none'}">${fmt(r.total)}</div>
-        </div>
-        ${bar}
-        <div class="split">${split}</div>
-      </div>`;
-  }).join('');
+function renderTabs(){
+  const el = document.getElementById('tabs');
+  if (LOCKED){ el.style.display = 'none'; return; }
+  el.innerHTML = ['All'].concat(CITIES).map(t =>
+    `<button type="button" data-tab="${esc(t)}" class="${t === state.tab ? 'on' : ''}">${esc(t)}</button>`
+  ).join('');
 }
 
-function renderSummary(view){
-  const total = grandTotal();
-  const t = state.payload.totals[state.attr];
-  const noun = state.attr === 'crm' ? 'form submission' : 'lead';
-  const counted = fmt(total) + ' ' + noun + (total === 1 ? '' : 's');
-  const parts = CHANNELS.map(ch => ch.label.toLowerCase() + ' ' + fmt(t[ch.key])).join(', ');
+function renderMetrics(){
+  const total = totalFor(state.tab);
+  const split = splitFor(state.tab);
+  const anyOther = (split.other || 0) > 0;
+  const channels = anyOther ? ALL_CHANNELS : CHANNELS;
 
-  const r = view.remainder;
-  let aside = '';
-  if (r.total){
-    const where = r.towns.map(x => x.name + ' ' + x.n);
-    if (r.noCity) where.push(r.noCity + ' with no city given');
-    aside = `<span class="elsewhere" title="${esc(where.join(', '))}">${fmt(r.total)} from elsewhere</span>`;
-  }
+  const cards = [{ label: 'Conversions', n: total, color: null, badge: '', headline: true }].concat(
+    channels.map(ch => ({
+      label: ch.label,
+      n: split[ch.key] || 0,
+      color: ch.color,
+      badge: total ? Math.round(((split[ch.key] || 0) / total) * 100) + '%' : '0%',
+      headline: false
+    }))
+  );
 
-  document.getElementById('summary').innerHTML =
-    `<span class="lead-total">${counted}</span>${aside}<span>${parts}</span>`;
-}
-
-/* =========================================================
-   DRILL-DOWN
-   Records exist only for the GoHighLevel view. They carry no
-   names, emails or phone numbers by design — the feed they come
-   from is readable by anyone holding its URL.
-========================================================= */
-function canDrill(){
-  return state.attr === 'crm' && (state.payload.submissions || []).length > 0;
-}
-
-function openDetail(city, channel){
-  state.detail = { city: city, channel: channel || null };
-  renderDetail();
-  document.getElementById('sheetView').hidden = true;
-  document.getElementById('detailView').hidden = false;
-  document.querySelector('#detailView .back').focus();
-  window.scrollTo({ top: 0, behavior: 'auto' });
-}
-
-function closeDetail(){
-  state.detail = null;
-  document.getElementById('detailView').hidden = true;
-  document.getElementById('sheetView').hidden = false;
-}
-
-function recordsFor(city, channel){
-  const inCity = city === null
-    ? []
-    : (state.payload.submissions || []).filter(s => {
-        const named = FEATURED_CITIES.some(f => f.toLowerCase() === city.toLowerCase());
-        return named ? s.city.toLowerCase() === city.toLowerCase()
-                     : !FEATURED_CITIES.some(f => f.toLowerCase() === s.city.toLowerCase());
-      });
-  return channel ? inCity.filter(s => s.bucket === channel) : inCity;
+  document.getElementById('metrics').innerHTML = cards.map(c => `
+    <div class="metric${c.headline ? ' headline' : ''}">
+      <div class="metric-top">
+        <span class="metric-name">${MARK}${c.color ? `<i class="sq" style="background:${c.color}"></i>` : ''}${esc(c.label)}</span>
+        ${c.badge ? `<span class="badge">${c.badge}</span>` : ''}
+      </div>
+      <div class="metric-figure${c.n ? '' : ' zero'}">${fmt(c.n)}</div>
+    </div>`).join('');
 }
 
 function longDate(iso){
   if (!iso) return '';
   const p = iso.split('-').map(Number);
-  return p[2] + ' ' + MONTHS[p[1] - 1];
+  return p[2] + ' ' + MONTHS[p[1] - 1] + ' ' + p[0];
 }
 
-function renderDetail(){
-  const d = state.detail;
-  const rows = recordsFor(d.city, d.channel);
-  const ch = CHANNELS.concat([OTHER]).filter(c => c.key === d.channel)[0];
-  const noun = rows.length === 1 ? 'submission' : 'submissions';
-
+function renderSubmissions(){
+  const rows = rowsFor(state.tab);
   const body = rows.length
     ? rows.map(r => {
-        const colour = (CHANNELS.concat([OTHER]).filter(c => c.key === r.bucket)[0] || OTHER).color;
+        const ch = ALL_CHANNELS.filter(c => c.key === r.bucket)[0] || OTHER;
         const extras = [];
         if (r.campaign && r.campaign !== '(not set)') extras.push(r.campaign);
         if (r.ad) extras.push('ad click');
+        if (r.form && r.form !== '(unknown form)') extras.push(r.form);
+        if (state.tab === 'All' && r.city) extras.unshift(r.city);
+        const hasMessage = !!(r.message && r.message.trim());
         return `
           <div class="record">
-            <div class="when">${esc(longDate(r.date))} <em>${esc(r.time)}</em></div>
-            <div class="how">
-              <i style="background:${colour}"></i>${esc(r.source)}
-              ${extras.length ? `<span class="extra">${esc(extras.join(' · '))}</span>` : ''}
+            <div class="rec-main">
+              <div class="rec-name">${esc(r.name || 'Enquiry')}</div>
+              ${r.service ? `<div class="rec-service">${esc(r.service)}</div>` : ''}
+              <div class="rec-msg${hasMessage ? '' : ' empty'}">${hasMessage ? esc(r.message) : 'No message included with this submission.'}</div>
             </div>
-            <div class="where">${esc(r.form)}</div>
+            <div class="rec-side">
+              <span class="tag ${esc(r.bucket)}">${esc(r.source)}</span>
+              <div class="rec-when">${esc(longDate(r.date))}, ${esc(r.time)}</div>
+              ${extras.length ? `<div class="rec-extra">${esc(extras.join(' · '))}</div>` : ''}
+            </div>
           </div>`;
       }).join('')
-    : '<div class="waiting">Nothing here for this period.</div>';
+    : '<div class="empty">No conversions in this period.</div>';
 
-  document.getElementById('detailView').innerHTML = `
-    <button class="back" type="button"><span>&larr;</span> All cities</button>
-    <div class="detail-head">
-      <h2>${esc(d.city)}</h2>
-      <span class="of">${fmt(rows.length)} ${noun}${ch ? ' from ' + esc(ch.label.toLowerCase()) : ''}</span>
-    </div>
-    ${body}`;
-
-  document.querySelector('#detailView .back').addEventListener('click', closeDetail);
+  document.getElementById('body').innerHTML = `
+    <div class="panel">
+      <div class="panel-top">
+        <h2>${state.tab === 'All' ? 'Conversions' : esc(state.tab) + ' conversions'}</h2>
+        <span class="count">${fmt(rows.length)}</span>
+      </div>
+      ${body}
+    </div>`;
 }
-
-document.getElementById('schedule').addEventListener('click', e => {
-  const el = e.target.closest('[data-city]');
-  if (!el) return;
-  openDetail(el.dataset.city, el.dataset.ch || null);
-});
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && state.detail) closeDetail();
-});
 
 function renderAll(){
-  updateSourceSwitch();
-  const view = buildView();
-  renderSchedule(view);
-  renderSummary(view);
-  // Switching period or source invalidates whatever was open.
-  if (state.detail) closeDetail();
+  renderTabs();
+  renderMetrics();
+  renderSubmissions();
+  updateCopyLinkLabel();
 }
 
-function updateSourceSwitch(){
-  const btn = document.getElementById('crmBtn');
-  const ready = !!state.payload.crmAvailable;
-  btn.disabled = !ready;
-  btn.title = ready ? 'The source recorded on each submission in GoHighLevel'
-                    : 'Connect the GoHighLevel API in the Apps Script to enable this';
-  if (ready && !state.attrChosen) state.attr = 'crm';
-  if (!ready && state.attr === 'crm') state.attr = 'session';
-  document.querySelectorAll('#sourceSwitch button').forEach(b => {
-    b.classList.toggle('on', b.dataset.attr === state.attr);
-  });
+document.getElementById('tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-tab]');
+  if (!b) return;
+  state.tab = b.dataset.tab;
+  renderAll();
+});
+
+/* =========================================================
+   COPY-LINK — turns the currently selected tab into a standalone,
+   embeddable URL: base page + ?city=<name> (or no param at all for
+   the combined "All" view). Paste the result straight into an
+   iframe src to show just that one location's conversions.
+========================================================= */
+function linkForTab(tab){
+  const url = new URL(location.href);
+  url.search = '';
+  if (tab !== 'All') url.searchParams.set('city', tab);
+  return url.toString();
 }
 
-document.querySelectorAll('#sourceSwitch button').forEach(b => {
-  b.addEventListener('click', () => {
-    if (b.disabled) return;
-    state.attr = b.dataset.attr;
-    state.attrChosen = true;
-    renderAll();
-  });
+function updateCopyLinkLabel(){
+  const btn = document.getElementById('copyLink');
+  if (LOCKED) { btn.style.display = 'none'; return; }
+  const label = document.getElementById('copyLinkLabel');
+  label.textContent = state.tab === 'All' ? 'Copy link' : 'Copy ' + state.tab + ' link';
+}
+
+async function copyText(text){
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      return true;
+    } catch (err2) {
+      return false;
+    }
+  }
+}
+
+document.getElementById('copyLink').addEventListener('click', async () => {
+  const btn = document.getElementById('copyLink');
+  const label = document.getElementById('copyLinkLabel');
+  const ok = await copyText(linkForTab(state.tab));
+  const original = label.textContent;
+  label.textContent = ok ? 'Copied!' : 'Could not copy';
+  btn.classList.toggle('done', ok);
+  setTimeout(() => { label.textContent = original; btn.classList.remove('done'); }, 1600);
 });
 
 /* =========================================================
    FEED
 ========================================================= */
 const cache = new Map();
-const inFlight = new Map();
 let seq = 0;
 
-function setFeed(text, mode){
-  const el = document.getElementById('feed');
+function setStatus(text, cls){
+  const el = document.getElementById('status');
   el.textContent = text;
-  el.className = 'feed' + (mode ? ' ' + mode : '');
+  el.className = 'status' + (cls ? ' ' + cls : '');
 }
 function markPeriod(mode, value){
-  document.querySelectorAll('#periodSwitch button').forEach(b => {
+  document.querySelectorAll('#periods button').forEach(b => {
     b.classList.toggle('on', b.dataset.mode === mode && (mode === 'custom' || Number(b.dataset.value) === value));
   });
 }
@@ -506,57 +427,45 @@ function paramFor(mode, value){
   return mode === 'range' ? 'rangeMonths=' + value : 'months=' + value;
 }
 
-function fetchPeriod(mode, value){
-  const key = mode + ':' + value;
-  if (inFlight.has(key)) return inFlight.get(key);
-  const sep = LIVE_DATA_URL.indexOf('?') === -1 ? '?' : '&';
-  const req = fetch(LIVE_DATA_URL + sep + paramFor(mode, value), { cache: 'no-store' })
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(d => {
-      if (!d || d.ok === false) throw new Error((d && d.error) || 'Bad response');
-      cache.set(key, d);
-      return d;
-    })
-    .finally(() => inFlight.delete(key));
-  inFlight.set(key, req);
-  return req;
-}
-
-async function load(mode, value, label){
+async function load(mode, value){
   markPeriod(mode, value);
   const key = mode + ':' + value;
   const mine = ++seq;
 
-  const show = data => {
-    state.payload = normalize(data);
-    document.getElementById('periodLabel').textContent = label || data.period || '';
+  if (cache.has(key)){
+    state.payload = normalize(cache.get(key));
+    setStatus(state.payload.connected ? 'Live' : 'Not connected', state.payload.connected ? 'live' : 'bad');
     renderAll();
-  };
+    return;
+  }
 
-  const cached = cache.get(key);
-  if (cached){ setFeed('Live', 'live'); show(cached); return; }
-
-  setFeed('Loading', 'busy');
+  setStatus('Loading');
   try {
-    const data = await fetchPeriod(mode, value);
+    const sep = LIVE_DATA_URL.indexOf('?') === -1 ? '?' : '&';
+    const url = LIVE_DATA_URL + sep + paramFor(mode, value) + (ACCESS_KEY ? '&key=' + encodeURIComponent(ACCESS_KEY) : '');
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data || data.ok === false) throw new Error((data && data.error) || 'Bad response');
     if (mine !== seq) return;
-    setFeed('Live', 'live');
-    show(data);
+    cache.set(key, data);
+    state.payload = normalize(data);
+    setStatus(state.payload.connected ? 'Live' : 'Not connected', state.payload.connected ? 'live' : 'bad');
+    renderAll();
   } catch (err){
     if (mine !== seq) return;
     console.warn('Feed unavailable:', err);
-    setFeed('Not connected', 'stale');
-    document.getElementById('periodLabel').textContent = 'Could not reach the data feed';
-    document.getElementById('schedule').innerHTML =
-      '<div class="waiting">The data feed did not respond. Reload to try again.</div>';
-    document.getElementById('summary').innerHTML = '';
+    setStatus('Not connected', 'bad');
+    document.getElementById('metrics').innerHTML = '';
+    document.getElementById('body').innerHTML =
+      '<div class="panel"><div class="empty">The data feed did not respond.</div></div>';
   }
 }
 
-document.querySelectorAll('#periodSwitch button').forEach(b => {
-  if (b.dataset.mode === 'custom') return;
+document.querySelectorAll('#periods button').forEach(b => {
+  if (!b.dataset.mode || b.dataset.mode === 'custom') return;
   b.addEventListener('click', () => {
-    document.getElementById('range').classList.remove('open');
+    document.getElementById('daterange').classList.remove('open');
     load(b.dataset.mode, Number(b.dataset.value));
   });
 });
@@ -564,52 +473,26 @@ document.querySelectorAll('#periodSwitch button').forEach(b => {
 /* =========================================================
    DATE RANGE
 ========================================================= */
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const from = document.getElementById('from');
 const to = document.getElementById('to');
-const rangeMsg = document.getElementById('rangeMsg');
 
 function todayThere(){
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: REPORTING_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit'
   }).format(new Date());
 }
-function pretty(iso){
-  const p = iso.split('-').map(Number);
-  return p[2] + ' ' + MONTHS[p[1] - 1] + ' ' + p[0];
-}
-function prettySpan(a, b){ return a === b ? pretty(a) : pretty(a) + ' to ' + pretty(b); }
-
-function checkRange(a, b){
-  const today = todayThere();
-  if (!a || !b) return { bad: true, text: 'Choose a start and an end date.' };
-  if (a > b) return { bad: true, text: 'The start date is after the end date.' };
-  if (b > today) return { bad: true, text: 'There is no data past ' + pretty(today) + ' yet.' };
-  return null;
-}
-function setMsg(v){
-  rangeMsg.textContent = v ? v.text : '';
-  rangeMsg.classList.toggle('bad', !!(v && v.bad));
-}
-
 function applyRange(){
-  const v = checkRange(from.value, to.value);
-  if (v && v.bad){ setMsg(v); return; }
-  setMsg(v);
-  load('custom', from.value + '|' + to.value, prettySpan(from.value, to.value));
+  const err = document.getElementById('rangeErr');
+  if (!from.value || !to.value){ err.textContent = 'Choose both dates.'; return; }
+  if (from.value > to.value){ err.textContent = 'The start date is after the end date.'; return; }
+  err.textContent = '';
+  load('custom', from.value + '|' + to.value);
 }
-
 document.getElementById('customBtn').addEventListener('click', () => {
-  const el = document.getElementById('range');
-  const open = !el.classList.contains('open');
-  el.classList.toggle('open', open);
-  if (open) from.focus();
-});
-[from, to].forEach(i => {
-  i.addEventListener('change', () => { if (from.value && to.value) setMsg(checkRange(from.value, to.value)); });
-  i.addEventListener('keydown', e => { if (e.key === 'Enter') applyRange(); });
+  document.getElementById('daterange').classList.toggle('open');
 });
 document.getElementById('apply').addEventListener('click', applyRange);
+[from, to].forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') applyRange(); }));
 
 (function seed(){
   const t = todayThere();
@@ -618,7 +501,8 @@ document.getElementById('apply').addEventListener('click', applyRange);
   to.value = t;
 })();
 
-load('month', 0);
+updateCopyLinkLabel();
+load(DEFAULT_PERIOD.mode, DEFAULT_PERIOD.value);
 </script>
 </body>
 </html>
