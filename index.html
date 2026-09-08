@@ -36,7 +36,9 @@
   html,body{margin:0;padding:0;background:var(--canvas);font-family:var(--font);color:var(--figure);
     -webkit-font-smoothing:antialiased;}
   body{padding:14px 0 30px;}
+  body.embed{padding:10px 0;}
   .wrap{max-width:1180px;margin:0 auto;padding:0 14px;}
+  body.embed .wrap{padding:0 10px;}
 
   /* ---------- toolbar ---------- */
   .toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px;}
@@ -91,6 +93,8 @@
   .metric-figure{flex:1;display:flex;align-items:center;justify-content:center;
     font-size:44px;font-weight:700;letter-spacing:-.02em;line-height:1;padding-top:8px;}
   .metric-figure.zero{color:#C9CDD3;}
+  .metric-error{grid-column:1/-1;background:var(--panel);border:1px solid var(--line);border-radius:4px;
+    padding:30px 16px;text-align:center;color:var(--muted);font-size:13px;box-shadow:var(--shadow);}
   @media (max-width:860px){ .metrics{grid-template-columns:repeat(2,1fr);} }
   @media (max-width:460px){ .metrics{grid-template-columns:1fr;} }
 
@@ -101,27 +105,33 @@
   .panel-top h2{font-size:13px;font-weight:500;color:var(--label);margin:0;}
   .panel-top .count{font-size:11.5px;color:var(--muted);}
 
-  /* ---------- submissions ---------- */
-  .record{padding:14px;border-bottom:1px solid var(--line-soft);display:flex;gap:16px;align-items:flex-start;}
-  .record:last-child{border-bottom:none;}
-  .record:hover{background:#FAFBFC;}
-  .rec-main{flex:1 1 auto;min-width:0;}
-  .rec-name{font-size:14px;font-weight:500;color:var(--figure);margin-bottom:3px;}
-  .rec-service{font-size:12.5px;color:var(--label);margin-bottom:7px;}
+  /* ---------- submissions accordion ---------- */
+  .acc-item{border-bottom:1px solid var(--line-soft);}
+  .acc-item:last-child{border-bottom:none;}
+  .acc-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;
+    background:none;border:none;text-align:left;font-family:var(--font);cursor:pointer;
+    padding:13px 14px;color:inherit;}
+  .acc-head:hover{background:#FAFBFC;}
+  .acc-head-left{display:flex;align-items:baseline;gap:8px;min-width:0;flex:1 1 auto;}
+  .acc-name{font-size:14px;font-weight:500;color:var(--figure);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .acc-service{font-size:12.5px;color:var(--label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .acc-head-right{display:flex;align-items:center;gap:10px;flex:none;}
+  .acc-date{font-size:12.5px;color:var(--label);white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .chev{color:var(--muted);transition:transform .2s ease;flex:none;}
+  .acc-item.open .chev{transform:rotate(180deg);}
+  .acc-body{max-height:0;overflow:hidden;transition:max-height .22s ease;}
+  .acc-body-inner{padding:0 14px 16px 14px;}
   .rec-msg{font-size:13px;line-height:1.6;color:#5A6169;white-space:pre-wrap;word-break:break-word;max-width:74ch;}
   .rec-msg.empty{color:var(--muted);font-style:italic;}
-  .rec-side{flex:none;width:172px;text-align:right;}
-  .rec-when{font-size:12.5px;color:var(--label);margin-top:7px;font-variant-numeric:tabular-nums;}
-  .rec-extra{font-size:11.5px;color:var(--muted);margin-top:3px;}
-  .tag{display:inline-block;font-size:11px;padding:3px 8px;border-radius:3px;line-height:1.5;}
+  .rec-extra{font-size:11.5px;color:var(--muted);margin-top:8px;}
+  .tag{display:inline-block;font-size:11px;padding:3px 8px;border-radius:3px;line-height:1.5;flex:none;}
   .tag.paid{background:#FBEEE1;color:#A2601F;}
   .tag.organic{background:#E6F4EC;color:#2F7350;}
   .tag.direct{background:#E9F0F8;color:#375F8C;}
   .tag.other{background:#EDEFF2;color:#6C7684;}
   @media (max-width:640px){
-    .record{flex-direction:column-reverse;gap:9px;}
-    .rec-side{width:auto;text-align:left;}
-    .rec-when{margin-top:5px;}
+    .acc-head{flex-wrap:wrap;row-gap:6px;}
+    .acc-head-right{width:100%;justify-content:space-between;}
   }
 
   .empty{padding:44px 16px;text-align:center;color:var(--muted);font-size:13px;}
@@ -142,15 +152,22 @@
 </svg>
 
 <div class="wrap">
-  <div class="toolbar">
+  <div class="toolbar" id="toolbar">
     <div class="toolbar-left">
       <div class="tabs" id="tabs"></div>
-      <button class="copylink" id="copyLink" type="button" title="Copy a link to this view for embedding elsewhere">
+      <button class="copylink" id="copyMetrics" type="button" title="Copy a link that embeds only the metric cards">
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none" aria-hidden="true">
           <path d="M8 12a4 4 0 0 0 5.66 0l2-2a4 4 0 1 0-5.66-5.66l-1 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
           <path d="M12 8a4 4 0 0 0-5.66 0l-2 2a4 4 0 1 0 5.66 5.66l1-1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
         </svg>
-        <span id="copyLinkLabel">Copy link</span>
+        <span id="copyMetricsLabel">Copy metrics link</span>
+      </button>
+      <button class="copylink" id="copySubmissions" type="button" title="Copy a link that embeds only the submissions list">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M8 12a4 4 0 0 0 5.66 0l2-2a4 4 0 1 0-5.66-5.66l-1 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M12 8a4 4 0 0 0-5.66 0l-2 2a4 4 0 1 0 5.66 5.66l1-1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <span id="copySubmissionsLabel">Copy submissions link</span>
       </button>
     </div>
     <div class="periods" id="periods">
@@ -177,17 +194,26 @@
 /* =========================================================
    CONFIG
    ---------------------------------------------------------
-   PER-CITY EMBEDS. Three ways to lock this page to one city,
-   checked in this order:
-     1. ?city=Red%20Deer on this page's own URL
-     2. FORCE_CITY below, for when the file is pasted rather
-        than linked
-     3. neither, which shows all three with tabs
-   A locked page hides the tabs entirely and reports only that
-   city's conversions — this is what makes a single HTML file into
-   three separate embeddable widgets. See the "Copy link" button in
-   the toolbar: select a tab, click it, and the URL for exactly that
-   view is on the clipboard, ready to paste into an iframe src.
+   THREE THINGS CAN BE LOCKED VIA THE URL, INDEPENDENTLY:
+
+   ?city=Red%20Deer     — restrict the data to one city.
+                          (or hardcode FORCE_CITY below)
+   ?view=metrics        — show ONLY the four metric cards.
+                          No toolbar, no period switcher, no
+                          submissions list. Nothing else loads.
+   ?view=submissions    — show ONLY the submissions list (as a
+                          click-to-expand accordion). No toolbar,
+                          no metric cards.
+   (no ?view=)          — the full hub: city tabs, period
+                          switcher, both metric cards and the
+                          submissions list, plus two "Copy link"
+                          buttons that build the ?view= links
+                          above for whichever tab is selected.
+
+   So for one city there are three usable links: the plain
+   ?city=X hub (for your own review, with a period switcher), and
+   the two locked-down ?city=X&view=metrics / &view=submissions
+   links, which are what you actually paste into an iframe.
 ========================================================= */
 const LIVE_DATA_URL = "https://script.google.com/macros/s/AKfycbwMw3AH2gtuOkya2wlQ4QSZDXPlNY1aUYwyHYVsi9YUukpFESgnVvLRStWdj-yyXQD8/exec";
 const ACCESS_KEY = "kcb-7f3a91c2";   // must match ACCESS_KEY in the Apps Script
@@ -216,16 +242,39 @@ const MARK = '<span class="mark" aria-hidden="true"><svg viewBox="0 0 20 20" wid
   + '<path d="M5 13.5 8.5 8l3 3.5L15 6" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
   + '</svg></span>';
 
+const urlParams = new URLSearchParams(location.search);
+
 function lockedCity(){
-  const q = new URLSearchParams(location.search).get('city');
+  const q = urlParams.get('city');
   const wanted = (q || FORCE_CITY || '').trim();
   if (!wanted) return null;
   const hit = CITIES.filter(c => c.toLowerCase() === wanted.toLowerCase())[0];
   return hit || null;
 }
 
+function currentView(){
+  const v = (urlParams.get('view') || '').toLowerCase();
+  return (v === 'metrics' || v === 'submissions') ? v : 'all';
+}
+
 const LOCKED = lockedCity();
+const VIEW = currentView();
 const state = { tab: LOCKED || 'All', payload: null };
+
+// Apply the view lock to the DOM once, up front — nothing conditional
+// left in the render functions themselves, so an embed never briefly
+// flashes chrome it's about to hide.
+if (VIEW !== 'all') {
+  document.body.classList.add('embed');
+  document.getElementById('toolbar').style.display = 'none';
+  document.getElementById('daterange').style.display = 'none';
+}
+if (VIEW === 'metrics') {
+  document.getElementById('body').style.display = 'none';
+}
+if (VIEW === 'submissions') {
+  document.getElementById('metrics').style.display = 'none';
+}
 
 /* =========================================================
    DATA
@@ -303,9 +352,8 @@ function longDate(iso){
 
 function renderSubmissions(){
   const rows = rowsFor(state.tab);
-  const body = rows.length
-    ? rows.map(r => {
-        const ch = ALL_CHANNELS.filter(c => c.key === r.bucket)[0] || OTHER;
+  const list = rows.length
+    ? '<div>' + rows.map((r, i) => {
         const extras = [];
         if (r.campaign && r.campaign !== '(not set)') extras.push(r.campaign);
         if (r.ad) extras.push('ad click');
@@ -313,19 +361,28 @@ function renderSubmissions(){
         if (state.tab === 'All' && r.city) extras.unshift(r.city);
         const hasMessage = !!(r.message && r.message.trim());
         return `
-          <div class="record">
-            <div class="rec-main">
-              <div class="rec-name">${esc(r.name || 'Enquiry')}</div>
-              ${r.service ? `<div class="rec-service">${esc(r.service)}</div>` : ''}
-              <div class="rec-msg${hasMessage ? '' : ' empty'}">${hasMessage ? esc(r.message) : 'No message included with this submission.'}</div>
-            </div>
-            <div class="rec-side">
-              <span class="tag ${esc(r.bucket)}">${esc(r.source)}</span>
-              <div class="rec-when">${esc(longDate(r.date))}, ${esc(r.time)}</div>
-              ${extras.length ? `<div class="rec-extra">${esc(extras.join(' · '))}</div>` : ''}
+          <div class="acc-item" data-i="${i}">
+            <button class="acc-head" type="button" aria-expanded="false">
+              <span class="acc-head-left">
+                <span class="acc-name">${esc(r.name || 'Enquiry')}</span>
+                ${r.service ? `<span class="acc-service">${esc(r.service)}</span>` : ''}
+              </span>
+              <span class="acc-head-right">
+                <span class="tag ${esc(r.bucket)}">${esc(r.source)}</span>
+                <span class="acc-date">${esc(longDate(r.date))}, ${esc(r.time)}</span>
+                <svg class="chev" width="12" height="12" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+            </button>
+            <div class="acc-body">
+              <div class="acc-body-inner">
+                <div class="rec-msg${hasMessage ? '' : ' empty'}">${hasMessage ? esc(r.message) : 'No message included with this submission.'}</div>
+                ${extras.length ? `<div class="rec-extra">${esc(extras.join(' · '))}</div>` : ''}
+              </div>
             </div>
           </div>`;
-      }).join('')
+      }).join('') + '</div>'
     : '<div class="empty">No conversions in this period.</div>';
 
   document.getElementById('body').innerHTML = `
@@ -334,15 +391,40 @@ function renderSubmissions(){
         <h2>${state.tab === 'All' ? 'Conversions' : esc(state.tab) + ' conversions'}</h2>
         <span class="count">${fmt(rows.length)}</span>
       </div>
-      ${body}
+      ${list}
     </div>`;
+
+  document.querySelectorAll('.acc-head').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = btn.closest('.acc-item');
+      const bodyEl = item.querySelector('.acc-body');
+      const isOpen = item.classList.contains('open');
+      if (isOpen) {
+        bodyEl.style.maxHeight = '0px';
+        item.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+      } else {
+        bodyEl.style.maxHeight = bodyEl.scrollHeight + 'px';
+        item.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+      }
+    });
+  });
+}
+
+function showFeedError(message){
+  if (VIEW !== 'submissions') {
+    document.getElementById('metrics').innerHTML = '<div class="metric-error">' + esc(message) + '</div>';
+  }
+  if (VIEW !== 'metrics') {
+    document.getElementById('body').innerHTML = '<div class="panel"><div class="empty">' + esc(message) + '</div></div>';
+  }
 }
 
 function renderAll(){
-  renderTabs();
-  renderMetrics();
-  renderSubmissions();
-  updateCopyLinkLabel();
+  if (VIEW === 'all') { renderTabs(); updateCopyLinks(); }
+  if (VIEW !== 'submissions') renderMetrics();
+  if (VIEW !== 'metrics') renderSubmissions();
 }
 
 document.getElementById('tabs').addEventListener('click', e => {
@@ -353,23 +435,23 @@ document.getElementById('tabs').addEventListener('click', e => {
 });
 
 /* =========================================================
-   COPY-LINK — turns the currently selected tab into a standalone,
-   embeddable URL: base page + ?city=<name> (or no param at all for
-   the combined "All" view). Paste the result straight into an
-   iframe src to show just that one location's conversions.
+   COPY-LINK — builds the two ?view= embed links (metrics /
+   submissions) for whichever tab is currently selected, and puts
+   whichever one is clicked onto the clipboard. Paste the result
+   straight into an iframe src.
 ========================================================= */
-function linkForTab(tab){
+function linkFor(view, tab){
   const url = new URL(location.href);
   url.search = '';
   if (tab !== 'All') url.searchParams.set('city', tab);
+  url.searchParams.set('view', view);
   return url.toString();
 }
 
-function updateCopyLinkLabel(){
-  const btn = document.getElementById('copyLink');
-  if (LOCKED) { btn.style.display = 'none'; return; }
-  const label = document.getElementById('copyLinkLabel');
-  label.textContent = state.tab === 'All' ? 'Copy link' : 'Copy ' + state.tab + ' link';
+function updateCopyLinks(){
+  const suffix = state.tab === 'All' ? '' : ' (' + state.tab + ')';
+  document.getElementById('copyMetricsLabel').textContent = 'Copy metrics link' + suffix;
+  document.getElementById('copySubmissionsLabel').textContent = 'Copy submissions link' + suffix;
 }
 
 async function copyText(text){
@@ -393,15 +475,19 @@ async function copyText(text){
   }
 }
 
-document.getElementById('copyLink').addEventListener('click', async () => {
-  const btn = document.getElementById('copyLink');
-  const label = document.getElementById('copyLinkLabel');
-  const ok = await copyText(linkForTab(state.tab));
-  const original = label.textContent;
-  label.textContent = ok ? 'Copied!' : 'Could not copy';
-  btn.classList.toggle('done', ok);
-  setTimeout(() => { label.textContent = original; btn.classList.remove('done'); }, 1600);
-});
+function wireCopyButton(btnId, labelId, view){
+  const btn = document.getElementById(btnId);
+  const label = document.getElementById(labelId);
+  btn.addEventListener('click', async () => {
+    const ok = await copyText(linkFor(view, state.tab));
+    const original = label.textContent;
+    label.textContent = ok ? 'Copied!' : 'Could not copy';
+    btn.classList.toggle('done', ok);
+    setTimeout(() => { label.textContent = original; btn.classList.remove('done'); }, 1600);
+  });
+}
+wireCopyButton('copyMetrics', 'copyMetricsLabel', 'metrics');
+wireCopyButton('copySubmissions', 'copySubmissionsLabel', 'submissions');
 
 /* =========================================================
    FEED
@@ -411,6 +497,7 @@ let seq = 0;
 
 function setStatus(text, cls){
   const el = document.getElementById('status');
+  if (!el) return;
   el.textContent = text;
   el.className = 'status' + (cls ? ' ' + cls : '');
 }
@@ -456,9 +543,7 @@ async function load(mode, value){
     if (mine !== seq) return;
     console.warn('Feed unavailable:', err);
     setStatus('Not connected', 'bad');
-    document.getElementById('metrics').innerHTML = '';
-    document.getElementById('body').innerHTML =
-      '<div class="panel"><div class="empty">The data feed did not respond.</div></div>';
+    showFeedError('The data feed did not respond.');
   }
 }
 
@@ -501,8 +586,19 @@ document.getElementById('apply').addEventListener('click', applyRange);
   to.value = t;
 })();
 
-updateCopyLinkLabel();
-load(DEFAULT_PERIOD.mode, DEFAULT_PERIOD.value);
+/* Initial period: honours ?start=&end=, ?rangeMonths=, or ?months= on
+   the URL even in a locked embed (so an embed can be pinned to, say,
+   "this month" instead of the default last month), falling back to
+   DEFAULT_PERIOD when none of those are present. */
+(function initialLoad(){
+  const start = urlParams.get('start'), end = urlParams.get('end');
+  if (start && end) { load('custom', start + '|' + end); return; }
+  const rangeMonths = urlParams.get('rangeMonths');
+  if (rangeMonths) { load('range', Number(rangeMonths)); return; }
+  const months = urlParams.get('months');
+  if (months !== null) { load('month', Number(months)); return; }
+  load(DEFAULT_PERIOD.mode, DEFAULT_PERIOD.value);
+})();
 </script>
 </body>
 </html>
